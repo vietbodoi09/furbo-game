@@ -3,7 +3,7 @@ const nextConfig = {
   
   
   reactStrictMode: true,
-  swcMinify: true,
+
   
   // Bắt buộc: Bỏ qua lỗi TypeScript/ESLint khi build
   typescript: {

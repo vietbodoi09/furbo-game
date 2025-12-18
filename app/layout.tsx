@@ -16,7 +16,7 @@ const inter = Inter({
 
 export const metadata = {
   title: 'Furbo Shooter - Blockchain Game on Fogo',
-  description: 'Real-time shooter game with gasless transactions on Fogo Mainnet',
+  description: 'Real-time shooter game on Fogo Mainnet',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {/* Footer */}
           <footer className="fixed bottom-0 w-full py-3 text-center text-xs text-gray-500 border-t border-gray-800/30 bg-black/50 backdrop-blur-sm">
             <div className="max-w-7xl mx-auto px-4">
-              Powered by <span className="text-cyan-400">Fogo Sessions</span> • Gasless Gaming • Built on Solana
+              Created by <span className="text-cyan-400">Catcake</span> • Gasless Gaming • Built on Fogo
             </div>
           </footer>
         </FogoSessionProvider>

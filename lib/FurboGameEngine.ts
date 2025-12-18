@@ -292,22 +292,79 @@ export class FurboGameEngine {
 
   // 3. Đăng ký player (QUAN TRỌNG NHẤT!)
   async registerPlayer(): Promise<boolean> {
-    console.log("=== REGISTER PLAYER START ===");
+    console.log("🎯 ====== REGISTER PLAYER CALLED ======");
+    console.log("1. Checking session state...");
     
     if (!this.sessionState) {
-      console.error("❌ No wallet connected");
+      console.error("❌ ERROR: No session state (wallet not connected)");
+      this.callbacks.onTransactionComplete?.('register', false);
       return false;
     }
+    
+    console.log("✅ Wallet connected:", this.sessionState.walletPublicKey.toString());
     
     if (!this.playerName || this.playerName.length < 3) {
-      console.error("❌ Invalid player name (min 3 chars)");
+      console.error("❌ ERROR: Invalid player name:", this.playerName);
+      this.callbacks.onTransactionComplete?.('register', false);
       return false;
     }
     
+    console.log("✅ Player name:", this.playerName);
+    
     if (!this.playerPDA || !this.gameStatePDA) {
-      console.error("❌ PDAs not initialized");
+      console.error("❌ ERROR: PDAs not initialized");
+      console.log("- Player PDA:", this.playerPDA?.toString());
+      console.log("- GameState PDA:", this.gameStatePDA?.toString());
+      this.callbacks.onTransactionComplete?.('register', false);
       return false;
     }
+    
+    console.log("✅ PDAs initialized");
+    
+    try {
+      console.log("🛠️ Creating register instruction...");
+      
+      const instruction = createRegisterPlayerIx(
+        this.playerPDA,
+        this.gameStatePDA,
+        this.sessionState.walletPublicKey,
+        this.playerName,
+        this.sessionState.sessionPublicKey
+      );
+      
+      console.log("📤 Instruction created, sending transaction...");
+      console.log("⚠️ Waiting for wallet approval...");
+      
+      const signature = await this.sendTransaction(instruction, 'register');
+      
+      if (signature) {
+        console.log("🎉 ====== REGISTRATION SUCCESS ======");
+        console.log("✅ Signature:", signature);
+        console.log("✅ Transaction link: https://fogoscan.com/tx/" + signature);
+        
+        this.isRegistered = true;
+        this.start(); // Auto start game
+        
+        this.callbacks.onChainUpdate({
+          playerName: this.playerName,
+          playerScore: 0,
+          playerKills: 0,
+          playerShots: 0,
+          isRegistered: true
+        });
+        
+        return true;
+      }
+      
+      console.error("❌ Registration failed: No signature returned");
+      return false;
+      
+    } catch (error) {
+      console.error("💥 ====== REGISTRATION ERROR ======");
+      console.error("Error:", error);
+      return false;
+    }
+  }
     
     console.log("📋 Registration details:");
     console.log("- Wallet:", this.sessionState.walletPublicKey.toString());

@@ -288,86 +288,72 @@ export class FurboGameEngine {
   // ✅ FIXED: HÀM REGISTER ĐÚNG
   async registerPlayer(): Promise<boolean> {
     console.log("🎯 ====== REGISTER PLAYER CALLED ======");
-    console.log("🔍 Session State:", {
+    
+    // SỬA: KHÔNG kiểm tra canSignTransactions nữa
+    // Thay vào đó kiểm tra xem session có sendTransaction method không
+    
+    console.log("🔍 Session State Debug:", {
       exists: !!this.sessionState,
-      wallet: this.sessionState?.walletPublicKey.toString(),
-      sessionKey: this.sessionState?.sessionPublicKey.toString(),
-      canSign: this.sessionState?.canSignTransactions
+      wallet: this.sessionState?.walletPublicKey?.toString(),
+      sessionKey: this.sessionState?.sessionPublicKey?.toString(),
+      hasSendTransaction: typeof this.sessionState?.sendTransaction === 'function'
     });
-    if (!this.sessionState?.canSignTransactions) {
-      console.error("❌ Session cannot sign transactions!");
-      console.log("⚠️ Try reconnecting wallet");
-      return false;
-    }
-    console.log("1. Checking session state...");
     
     if (!this.sessionState) {
-      console.error("❌ ERROR: No session state (wallet not connected)");
-      this.callbacks.onTransactionComplete?.('register', false);
+      console.error("❌ ERROR: No session state");
       return false;
     }
     
-    console.log("✅ Wallet connected:", this.sessionState.walletPublicKey.toString());
+    // QUAN TRỌNG: Kiểm tra sendTransaction method thay vì canSignTransactions
+    if (typeof this.sessionState.sendTransaction !== 'function') {
+      console.error("❌ Session doesn't have sendTransaction method!");
+      console.log("💡 Cần reconnect wallet với đầy đủ permissions");
+      
+      // Gợi ý user reconnect
+      alert("⚠️ Vui lòng reconnect wallet!\n1. Disconnect wallet\n2. Refresh trang\n3. Connect lại và approve ALL permissions");
+      return false;
+    }
     
+    console.log("✅ Session valid, has sendTransaction method");
+    
+    // Kiểm tra name và PDAs...
     if (!this.playerName || this.playerName.length < 3) {
-      console.error("❌ ERROR: Invalid player name:", this.playerName);
-      this.callbacks.onTransactionComplete?.('register', false);
+      console.error("❌ Invalid player name");
       return false;
     }
-    
-    console.log("✅ Player name:", this.playerName);
     
     if (!this.playerPDA || !this.gameStatePDA) {
-      console.error("❌ ERROR: PDAs not initialized");
-      console.log("- Player PDA:", this.playerPDA?.toString());
-      console.log("- GameState PDA:", this.gameStatePDA?.toString());
-      this.callbacks.onTransactionComplete?.('register', false);
+      console.error("❌ PDAs not initialized");
       return false;
     }
-    
-    console.log("✅ PDAs initialized");
     
     try {
       console.log("🛠️ Creating register instruction...");
       
+      // SỬA: Đảm bảo instruction đúng format
       const instruction = createRegisterPlayerIx(
         this.playerPDA,
         this.gameStatePDA,
-        this.sessionState.walletPublicKey,
+        this.sessionState.walletPublicKey,  // Authority
         this.playerName,
-        this.sessionState.sessionPublicKey
+        this.sessionState.sessionPublicKey   // Session key
       );
       
-      console.log("📤 Instruction created, sending transaction...");
-      console.log("⚠️ Waiting for wallet approval...");
+      console.log("📤 Sending transaction via session...");
       
-      const signature = await this.sendTransaction(instruction, 'register');
+      // Thử gửi transaction
+      const signature = await this.sessionState.sendTransaction([instruction]);
       
       if (signature) {
-        console.log("🎉 ====== REGISTRATION SUCCESS ======");
-        console.log("✅ Signature:", signature);
-        console.log("✅ Transaction link: https://fogoscan.com/tx/" + signature);
-        
+        console.log("✅ Registration success!");
         this.isRegistered = true;
-        this.start();
-        
-        this.callbacks.onChainUpdate({
-          playerName: this.playerName,
-          playerScore: 0,
-          playerKills: 0,
-          playerShots: 0,
-          isRegistered: true
-        });
-        
         return true;
       }
       
-      console.error("❌ Registration failed: No signature returned");
       return false;
       
     } catch (error) {
-      console.error("💥 ====== REGISTRATION ERROR ======");
-      console.error("Error:", error);
+      console.error("💥 Registration error:", error);
       return false;
     }
   }

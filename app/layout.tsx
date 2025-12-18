@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${orbitron.variable} ${inter.variable}`}>
       <body className="min-h-screen bg-black text-white overflow-x-hidden">
         <FogoSessionProvider
-          network={Network.Mainnet}
+          network={Network.Testnet}
           domain={process.env.NODE_ENV === "production" 
             ? "https://furbocoin.meme" 
             : "http://localhost:3000"}

@@ -2,11 +2,21 @@ import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
 import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { connection } from "./connection";
+import { sha256 } from 'js-sha256';
 
 // 🔥 PROGRAM ID THỰC
-export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWbWf3v7Jvhjsxawgzf28fAQvN3uf');
+export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWfF3v7Jvhjsxawgzf28fAQvN3uf');
 
-// 🔥 PDAs HELPER FUNCTIONS
+// 🔥 ANCHOR DISCRIMINATOR HELPER
+function getAnchorDiscriminator(instructionName: string): Buffer {
+  const namespace = "global";
+  const preimage = `${namespace}:${instructionName}`;
+  const hash = sha256(preimage);
+  // Lấy 8 bytes đầu (16 chars hex)
+  return Buffer.from(hash.slice(0, 16), 'hex');
+}
+
+// 🔥 PDAs HELPER FUNCTIONS (Giữ nguyên)
 export const getGameStatePDA = (): [PublicKey, number] => {
   return PublicKey.findProgramAddressSync(
     [Buffer.from('game_state')],
@@ -21,7 +31,7 @@ export const getPlayerPDA = (wallet: PublicKey): [PublicKey, number] => {
   );
 };
 
-// 🔥 TYPES
+// 🔥 TYPES (Giữ nguyên)
 export interface ChainData {
   playerScore?: number;
   playerKills?: number;
@@ -46,15 +56,19 @@ export interface GameCallbacks {
   }) => void;
 }
 
-// 🔥 FIXED INSTRUCTION BUILDERS - CHUẨN XÁC VỚI RUST PROGRAM
+// 🔥 FIXED INSTRUCTION BUILDERS - ANCHOR FORMAT
 
-// Index 0: initialize_game
+// initialize_game - Anchor format
 export const createInitializeGameIx = (
   gameStatePDA: PublicKey,
   authority: PublicKey
 ): TransactionInstruction => {
-  const data = Buffer.alloc(1); // Chỉ 1 byte cho instruction index
-  data.writeUInt8(0, 0); // Index 0
+  const discriminator = getAnchorDiscriminator("initialize_game");
+  const data = Buffer.alloc(8); // Chỉ discriminator
+  
+  discriminator.copy(data, 0);
+  
+  console.log("InitializeGame discriminator:", discriminator.toString('hex'));
   
   const keys = [
     { pubkey: gameStatePDA, isSigner: false, isWritable: true },
@@ -69,7 +83,7 @@ export const createInitializeGameIx = (
   });
 };
 
-// Index 1: register_player
+// register_player - Anchor format
 export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -77,14 +91,31 @@ export const createRegisterPlayerIx = (
   name: string,
   sessionKey: PublicKey
 ): TransactionInstruction => {
+  const discriminator = getAnchorDiscriminator("register_player");
   const nameBuffer = Buffer.from(name, 'utf8');
-  const data = Buffer.alloc(1 + 4 + nameBuffer.length + 32);
+  
+  // Anchor format: discriminator(8) + name_len(4) + name + session_key(32)
+  const data = Buffer.alloc(8 + 4 + nameBuffer.length + 32);
   let offset = 0;
   
-  data.writeUInt8(1, offset); offset += 1; // Index 1
-  data.writeUInt32LE(nameBuffer.length, offset); offset += 4; // Name length
-  nameBuffer.copy(data, offset); offset += nameBuffer.length; // Name bytes
-  sessionKey.toBuffer().copy(data, offset); offset += 32; // Session key
+  // Discriminator
+  discriminator.copy(data, offset); offset += 8;
+  
+  // Name length (u32)
+  data.writeUInt32LE(nameBuffer.length, offset); offset += 4;
+  
+  // Name bytes
+  nameBuffer.copy(data, offset); offset += nameBuffer.length;
+  
+  // Session key
+  sessionKey.toBuffer().copy(data, offset); offset += 32;
+  
+  console.log("RegisterPlayer Anchor data:", {
+    discriminator: discriminator.toString('hex'),
+    nameLength: nameBuffer.length,
+    totalBytes: data.length,
+    hexPreview: data.toString('hex').substring(0, 50) + '...'
+  });
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -100,17 +131,20 @@ export const createRegisterPlayerIx = (
   });
 };
 
-// Index 2: update_session
+// update_session - Anchor format
 export const createUpdateSessionIx = (
   playerPDA: PublicKey,
   authority: PublicKey,
   newSessionKey: PublicKey
 ): TransactionInstruction => {
-  const data = Buffer.alloc(1 + 32);
+  const discriminator = getAnchorDiscriminator("update_session");
+  
+  // Anchor format: discriminator(8) + session_key(32)
+  const data = Buffer.alloc(8 + 32);
   let offset = 0;
   
-  data.writeUInt8(2, offset); offset += 1; // Index 2
-  newSessionKey.toBuffer().copy(data, offset); offset += 32; // New session key
+  discriminator.copy(data, offset); offset += 8;
+  newSessionKey.toBuffer().copy(data, offset); offset += 32;
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -124,7 +158,7 @@ export const createUpdateSessionIx = (
   });
 };
 
-// Index 3: game_action - FIXED! (5 bytes: 1 + 1 + 2 + 2)
+// game_action - Anchor format
 export const createGameActionIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -133,15 +167,18 @@ export const createGameActionIx = (
   x: number, // 0-65535
   y: number  // 0-65535
 ): TransactionInstruction => {
-  const data = Buffer.alloc(5); // Chỉ 5 bytes!
+  const discriminator = getAnchorDiscriminator("game_action");
+  
+  // Anchor format: discriminator(8) + action_type(1) + x(2) + y(2)
+  const data = Buffer.alloc(8 + 1 + 2 + 2);
   let offset = 0;
   
-  data.writeUInt8(3, offset); offset += 1; // Index 3
-  data.writeUInt8(actionType, offset); offset += 1; // Action type (1 byte)
-  data.writeUInt16LE(x, offset); offset += 2; // X (2 bytes)
-  data.writeUInt16LE(y, offset); offset += 2; // Y (2 bytes)
+  discriminator.copy(data, offset); offset += 8;
+  data.writeUInt8(actionType, offset); offset += 1;
+  data.writeUInt16LE(x, offset); offset += 2;
+  data.writeUInt16LE(y, offset); offset += 2;
   
-  console.log(`Game action data: ${data.toString('hex')}`);
+  console.log(`GameAction data (hex): ${data.toString('hex')}`);
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -156,7 +193,7 @@ export const createGameActionIx = (
   });
 };
 
-// Index 4: end_game
+// end_game - Anchor format
 export const createEndGameIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -165,13 +202,16 @@ export const createEndGameIx = (
   finalKills: number,
   finalShots: number
 ): TransactionInstruction => {
-  const data = Buffer.alloc(1 + 8 + 4 + 4);
+  const discriminator = getAnchorDiscriminator("end_game");
+  
+  // Anchor format: discriminator(8) + score(8) + kills(4) + shots(4)
+  const data = Buffer.alloc(8 + 8 + 4 + 4);
   let offset = 0;
   
-  data.writeUInt8(4, offset); offset += 1; // Index 4
-  data.writeBigUInt64LE(BigInt(finalScore), offset); offset += 8; // Score
-  data.writeUInt32LE(finalKills, offset); offset += 4; // Kills
-  data.writeUInt32LE(finalShots, offset); offset += 4; // Shots
+  discriminator.copy(data, offset); offset += 8;
+  data.writeBigUInt64LE(BigInt(finalScore), offset); offset += 8;
+  data.writeUInt32LE(finalKills, offset); offset += 4;
+  data.writeUInt32LE(finalShots, offset); offset += 4;
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -186,26 +226,31 @@ export const createEndGameIx = (
   });
 };
 
-// Index 5: batch_actions
+// batch_actions - Anchor format (tuỳ chọn)
 export const createBatchActionsIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
   signer: PublicKey,
   actions: Array<{ action_type: number, timestamp: number }>
 ): TransactionInstruction => {
+  const discriminator = getAnchorDiscriminator("batch_actions");
+  
   // Mỗi action: 1 byte (action_type) + 8 bytes (timestamp)
-  const data = Buffer.alloc(1 + 4 + (actions.length * 9));
+  const actionsSize = actions.length * (1 + 8);
+  const data = Buffer.alloc(8 + 4 + actionsSize);
   let offset = 0;
   
-  data.writeUInt8(5, offset); offset += 1; // Index 5
-  data.writeUInt32LE(actions.length, offset); offset += 4; // Number of actions
+  discriminator.copy(data, offset); offset += 8;
+  
+  // Number of actions (u32)
+  data.writeUInt32LE(actions.length, offset); offset += 4;
   
   for (const action of actions) {
-    data.writeUInt8(action.action_type, offset); offset += 1; // Action type
+    data.writeUInt8(action.action_type, offset); offset += 1;
     
     const timestampBuffer = Buffer.alloc(8);
     timestampBuffer.writeBigInt64LE(BigInt(action.timestamp));
-    timestampBuffer.copy(data, offset); offset += 8; // Timestamp
+    timestampBuffer.copy(data, offset); offset += 8;
   }
   
   const keys = [
@@ -221,7 +266,7 @@ export const createBatchActionsIx = (
   });
 };
 
-// 🔥 MAIN GAME ENGINE CLASS - REAL-TIME VERSION
+// 🔥 MAIN GAME ENGINE CLASS - ĐÃ FIX ANCHOR FORMAT
 export class FurboGameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -261,9 +306,9 @@ export class FurboGameEngine {
   
   // Debouncing
   private lastMoveTime: number = 0;
-  private moveDebounceMs: number = 500; // Send move every 500ms max
+  private moveDebounceMs: number = 500;
   private lastKillTime: number = 0;
-  private killDebounceMs: number = 100; // Minimal delay between kills
+  private killDebounceMs: number = 100;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -304,7 +349,6 @@ export class FurboGameEngine {
     if (sessionState && oldSessionState?.walletPublicKey.toString() !== sessionState.walletPublicKey.toString()) {
       this.initializeChainState();
       
-      // Update session key on chain if already registered
       if (this.isRegistered && this.playerPDA) {
         this.updateSessionKey();
       }
@@ -344,7 +388,7 @@ export class FurboGameEngine {
         return;
       }
 
-      // TODO: Parse actual player data from account
+      // TODO: Parse player data từ account
       this.isRegistered = true;
       
       this.callbacks.onChainUpdate({
@@ -394,6 +438,7 @@ export class FurboGameEngine {
         throw new Error('PDAs not initialized');
       }
 
+      console.log("Creating Anchor register instruction...");
       const instruction = createRegisterPlayerIx(
         this.playerPDA,
         this.gameStatePDA,
@@ -402,10 +447,12 @@ export class FurboGameEngine {
         this.sessionState.sessionPublicKey
       );
 
-      const signature = await this.sendTransaction(instruction, 'register_player');
+      console.log("Sending registration transaction...");
+      const signature = await this.sendTransaction(instruction, 'register');
       
       if (signature) {
         this.isRegistered = true;
+        this.start(); // Auto start game after registration
         
         this.callbacks.onChainUpdate({
           playerName: this.playerName,
@@ -427,9 +474,13 @@ export class FurboGameEngine {
     }
   }
 
+  // ========== GAME CONTROL ==========
+  
   start() {
+    console.log("Starting game... isRunning was:", this.isRunning);
     if (this.isRunning) return;
     this.isRunning = true;
+    console.log("Game started successfully");
     this.gameLoop();
   }
 
@@ -467,7 +518,7 @@ export class FurboGameEngine {
     
     let moved = false;
     
-    // Handle movement - REALTIME
+    // Handle movement
     if (this.keysPressed['ArrowLeft']) {
       this.player.x = Math.max(0, this.player.x - this.player.speed);
       moved = true;
@@ -478,7 +529,7 @@ export class FurboGameEngine {
       moved = true;
     }
     
-    // Send move action with debouncing
+    // Send move action với debouncing
     if (moved && currentTime - this.lastMoveTime > this.moveDebounceMs) {
       this.sendMoveAction();
       this.lastMoveTime = currentTime;
@@ -488,7 +539,7 @@ export class FurboGameEngine {
     this.bullets = this.bullets.filter(bullet => {
       bullet.y -= bullet.speed;
       
-      // Check for collisions with enemies
+      // Check collisions với enemies
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const enemy = this.enemies[i];
         if (this.checkCollision(bullet, enemy)) {
@@ -496,7 +547,7 @@ export class FurboGameEngine {
           this.score += 100;
           this.kills++;
           
-          // Send kill action - REALTIME
+          // Send kill action
           if (currentTime - this.lastKillTime > this.killDebounceMs) {
             this.sendKillAction();
             this.lastKillTime = currentTime;
@@ -540,17 +591,21 @@ export class FurboGameEngine {
     };
     this.enemies.push(enemy);
   }
+  
   private checkCollision(rect1: any, rect2: any): boolean {
-      return rect1.x < rect2.x + rect2.width &&
-             rect1.x + rect1.width > rect2.x &&
-             rect1.y < rect2.y + rect2.height &&
-             rect1.y + rect1.height > rect2.y;
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
   }
 
-  // ========== REALTIME ACTION FUNCTIONS ==========
+  // ========== BLOCKCHAIN ACTIONS ==========
 
   private async sendMoveAction(): Promise<void> {
-    if (!this.canSendAction()) return;
+    if (!this.canSendAction()) {
+      console.log("Cannot send move: action blocked");
+      return;
+    }
     
     try {
       const instruction = createGameActionIx(
@@ -572,7 +627,15 @@ export class FurboGameEngine {
   }
 
   async shoot(): Promise<void> {
-    if (!this.isRunning || !this.canSendAction()) return;
+    if (!this.isRunning) {
+      console.log("Game is not running, cannot shoot");
+      return;
+    }
+    
+    if (!this.canSendAction()) {
+      console.log("Cannot shoot: action blocked");
+      return;
+    }
 
     // Add bullet visually
     this.bullets.push({
@@ -585,7 +648,7 @@ export class FurboGameEngine {
 
     this.shots++;
     
-    // Send shoot action - REALTIME
+    // Send shoot action
     try {
       const instruction = createGameActionIx(
         this.playerPDA!,
@@ -628,7 +691,15 @@ export class FurboGameEngine {
   }
 
   private canSendAction(): boolean {
-    return !!(this.sessionState && this.isRegistered && this.playerPDA && this.gameStatePDA);
+    const canSend = !!(this.sessionState && this.isRegistered && this.playerPDA && this.gameStatePDA);
+    console.log("canSendAction:", { 
+      hasSession: !!this.sessionState, 
+      isRegistered: this.isRegistered,
+      hasPlayerPDA: !!this.playerPDA,
+      hasGameStatePDA: !!this.gameStatePDA,
+      result: canSend
+    });
+    return canSend;
   }
 
   private async sendGameOverToChain() {
@@ -646,7 +717,7 @@ export class FurboGameEngine {
 
       await this.sendTransaction(instruction, 'end_game');
       
-      // Reset local stats after saving to chain
+      // Reset local stats
       this.score = 0;
       this.kills = 0;
       this.shots = 0;
@@ -661,10 +732,12 @@ export class FurboGameEngine {
     this.isRunning = false;
     this.pause();
     this.sendGameOverToChain();
+    alert(`Game Over! Final Score: ${this.score}`);
   }
 
   private async sendTransaction(instruction: TransactionInstruction, type: string): Promise<string | null> {
     if (!this.sessionState) {
+      console.error("No session state for transaction");
       this.callbacks.onTransactionComplete?.(type, false);
       this.callbacks.onTransactionFeedUpdate?.({
         type: type as any,
@@ -680,16 +753,18 @@ export class FurboGameEngine {
     const actionType = type === 'move' ? 'move' : 
                    type === 'shoot' ? 'shoot' : 
                    type === 'kill' ? 'kill' : 
-                   type === 'register_player' ? 'register' : 
+                   type === 'register' ? 'register' : 
                    type === 'end_game' ? 'end_game' : 'update_session';
+    
     this.callbacks.onTransactionFeedUpdate?.({
-        type: actionType,
-        status: 'pending',
-        message: `${actionType.replace('_', ' ')} sending...`,
-        details: type === 'move' ? `position: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})` : 
-                 type === 'shoot' ? `shots: ${this.shots}` :
-                 type === 'kill' ? `total kills: ${this.kills}` : undefined
-      });
+      type: actionType,
+      status: 'pending',
+      message: `${actionType.replace('_', ' ')} sending...`,
+      details: type === 'move' ? `position: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})` : 
+               type === 'shoot' ? `shots: ${this.shots}` :
+               type === 'kill' ? `total kills: ${this.kills}` : 
+               type === 'register' ? `name: ${this.playerName}` : undefined
+    });
 
     try {
       this.performanceStats.pendingTx++;
@@ -708,17 +783,17 @@ export class FurboGameEngine {
         message: type === 'move' ? 'Move action confirmed' :
                  type === 'shoot' ? 'Shoot action confirmed' :
                  type === 'kill' ? 'Enemy killed! +100 points' :
-                 type === 'register_player' ? 'Player registered successfully' :
+                 type === 'register' ? 'Player registered successfully' :
                  type === 'end_game' ? 'Game saved to blockchain' :
                  'Session updated',
         details: type === 'move' ? `position: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})` : 
                  type === 'shoot' ? `total shots: ${this.shots}` :
                  type === 'kill' ? `total kills: ${this.kills}` :
-                 type === 'register_player' ? `name: ${this.playerName}` :
+                 type === 'register' ? `name: ${this.playerName}` :
                  type === 'end_game' ? `final score: ${this.score}` :
                  'session key updated'
-      });    
-      // Keep only last 50 confirmation times
+      });
+      
       if (this.performanceStats.confirmationTimes.length > 50) {
         this.performanceStats.confirmationTimes.shift();
       }
@@ -727,7 +802,7 @@ export class FurboGameEngine {
       this.updatePerformance();
       
       console.log(`✅ ${type} tx confirmed in ${confirmTime.toFixed(0)}ms: ${signature}`);
-      console.log(`   Signature: https://fogoscan.com//tx/${signature}?cluster=testnet`);
+      console.log(`   Signature: https://fogoscan.com/tx/${signature}?cluster=testnet`);
       
       this.callbacks.onTransactionComplete?.(type, true, signature);
       
@@ -753,24 +828,20 @@ export class FurboGameEngine {
   }
 
   private updatePerformance() {
-    // Calculate average confirmation time
     if (this.performanceStats.confirmationTimes.length > 0) {
       const sum = this.performanceStats.confirmationTimes.reduce((a, b) => a + b, 0);
       this.performanceStats.avgConfirm = Math.floor(sum / this.performanceStats.confirmationTimes.length);
     }
     
-    // Calculate success rate
     const totalAttempted = this.performanceStats.totalActions;
     const successful = this.performanceStats.confirmationTimes.length;
     this.performanceStats.successRate = totalAttempted > 0 ? 
       Math.round((successful / totalAttempted) * 100) : 100;
     
-    // Send update to UI
     this.callbacks.onPerformanceUpdate({ ...this.performanceStats });
   }
 
-  // ========== RENDERING ==========
-
+  // ========== RENDERING (Giữ nguyên) ==========
   private render() {
     this.ctx.fillStyle = '#0a1929';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -910,7 +981,20 @@ export class FurboGameEngine {
   // ========== EVENT HANDLERS ==========
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    if (!this.isRunning) return;
+    console.log("Key pressed:", e.code, "isRunning:", this.isRunning);
+    
+    if (!this.isRunning) {
+      // Cho phép space để start game nếu chưa running
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!this.isRunning && this.isRegistered) {
+          this.start();
+          this.reset();
+        }
+      }
+      return;
+    }
+    
     this.keysPressed[e.code] = true;
 
     if (e.code === 'Space') {

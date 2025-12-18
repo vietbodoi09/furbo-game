@@ -1,11 +1,11 @@
-
 "use client"
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react"; // ĐÃ THÊM
 import { useSession, isEstablished, SessionButton } from "@fogo/sessions-sdk-react";
 import Leaderboard from "@/components/Leaderboard";
 import GameCanvas from "@/components/GameCanvas";
 import PerformanceDashboard from "@/components/PerformanceDashboard";
+import { FurboGameEngine } from "@/components/FurboGameEngine"; // ĐÃ THÊM
 
 export default function GamePage() {
   // 🔗 Session state
@@ -30,15 +30,6 @@ export default function GamePage() {
     chainSpeed: 0
   });
   
-  // ⛓️ Blockchain data
-  const [chainData, setChainData] = useState({
-    playerScore: 0,
-    playerKills: 0,
-    playerShots: 0,
-    playerName: "",
-    isRegistered: false
-  });
-
   // ==============================================
   // 1️⃣ INITIALIZE GAME ENGINE
   // ==============================================
@@ -50,54 +41,38 @@ export default function GamePage() {
         canvasRef.current,
         isEstablished(sessionState) ? sessionState : undefined,
         {
-          // 📈 Score updates
+          // 📈 Score updates - ĐÚNG VỚI GỐC
           onScoreUpdate: (newScore) => {
             setScore(newScore);
             console.log(`🎯 Score updated: ${newScore}`);
           },
           
-          // ⏱️ Game time updates
+          // ⏱️ Game time updates - ĐÚNG VỚI GỐC
           onGameTimeUpdate: (time) => {
             setGameTime(time);
             console.log(`⏰ Game time: ${time}s`);
           },
           
-          // 📊 Performance metrics updates
+          // 📊 Performance metrics updates - ĐÚNG VỚI GỐC
           onPerformanceUpdate: (stats) => {
             setPerformanceStats(stats);
             console.log("📈 Performance updated:", stats);
-          },
-          
-          // 🔗 Blockchain data updates
-          onChainUpdate: (data) => {
-            setChainData(data);
-            setIsRegistered(data.isRegistered || false);
-            if (data.playerName) {
-              setPlayerName(data.playerName);
-            }
-            console.log("⛓️ Chain data updated:", data);
-          },
-          
-          // ✅ Transaction completion callbacks
-          onTransactionComplete: (type, success, signature) => {
-            const emoji = success ? "✅" : "❌";
-            console.log(`${emoji} Transaction ${type}: ${success ? "Success" : "Failed"}`, 
-                      signature ? `Signature: ${signature.slice(0, 16)}...` : "");
           }
+          // XÓA: onChainUpdate, onTransactionComplete (KHÔNG CÓ TRONG CLASS GỐC)
         }
       );
       
       setGameEngine(engine);
-      console.log("✅ FurboGameEngine initialized successfully!");
+      console.log("✅ FurboGameEngine initialized!");
       
-      // 🧹 Cleanup when component unmounts
+      // 🧹 Cleanup
       return () => {
         console.log("🧹 Cleaning up game engine...");
         engine.destroy();
         setGameEngine(null);
       };
     }
-  }, [canvasRef.current]);
+  }, [canvasRef.current, sessionState]);
 
   // ==============================================
   // 2️⃣ UPDATE SESSION WHEN CHANGED
@@ -110,33 +85,22 @@ export default function GamePage() {
   }, [sessionState, gameEngine]);
 
   // ==============================================
-  // 3️⃣ PLAYER REGISTRATION HANDLER
+  // 3️⃣ PLAYER REGISTRATION HANDLER - SỬA LẠI
   // ==============================================
-  const handleRegister = async () => {
-    if (!gameEngine || !playerName.trim()) {
+  const handleRegister = () => {
+    if (!playerName.trim() || playerName.length < 3) {
       alert("❌ Please enter a player name (min 3 characters)");
       return;
     }
     
-    console.log(`👤 Registering player: ${playerName}`);
-    
-    // Set name in engine
-    gameEngine.setPlayerName(playerName);
-    
-    // Call blockchain registration
-    const success = await gameEngine.registerPlayer();
-    
-    if (success) {
-      alert(`🎉 Successfully registered as: ${playerName}`);
-      console.log(`✅ Player ${playerName} registered on-chain`);
-    } else {
-      alert("❌ Registration failed. Please check connection and try again!");
-      console.error("❌ Player registration failed");
-    }
+    console.log(`👤 Player name set: ${playerName}`);
+    setIsRegistered(true);
+    alert(`✅ Registered as: ${playerName}`);
+    // TODO: Thêm blockchain registration sau
   };
 
   // ==============================================
-  // 4️⃣ GAME CONTROL HANDLERS
+  // 4️⃣ GAME CONTROL HANDLERS - SỬA LẠI
   // ==============================================
   const handleStart = () => {
     if (gameEngine) {
@@ -157,33 +121,15 @@ export default function GamePage() {
   const handleReset = () => {
     if (gameEngine) {
       console.log("🔄 Resetting game...");
-      gameEngine.reset();
       setIsPlaying(false);
       setScore(0);
       setGameTime(0);
+      // XÓA: gameEngine.reset() - KHÔNG CÓ METHOD NÀY
     }
   };
 
   // ==============================================
-  // 5️⃣ INITIALIZE GAME ON CHAIN
-  // ==============================================
-  const handleInitializeGame = async () => {
-    if (!gameEngine) return;
-    
-    console.log("🚀 Initializing game on blockchain...");
-    const success = await gameEngine.initializeGameOnChain();
-    
-    if (success) {
-      alert("✅ Game successfully initialized on blockchain!");
-      console.log("✅ Game state initialized on-chain");
-    } else {
-      alert("❌ Game initialization failed. Already initialized?");
-      console.error("❌ Game initialization failed");
-    }
-  };
-
-  // ==============================================
-  // 🎮 RENDER GAME INTERFACE
+  // 🎮 RENDER GAME INTERFACE - SỬA ĐƠN GIẢN
   // ==============================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 md:p-8">
@@ -199,7 +145,6 @@ export default function GamePage() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Connection status badge */}
             <div className={`px-4 py-2 rounded-full ${
               isEstablished(sessionState) 
                 ? 'bg-green-900/30 text-green-400' 
@@ -207,8 +152,6 @@ export default function GamePage() {
             }`}>
               {isEstablished(sessionState) ? '🟢 Connected' : '🔴 Not Connected'}
             </div>
-            
-            {/* Fogo Session connect button */}
             <SessionButton />
           </div>
         </div>
@@ -230,20 +173,9 @@ export default function GamePage() {
                 <div className="text-2xl font-bold space-x-6">
                   <span className="text-yellow-400">SCORE: {score}</span>
                   <span className="text-green-400">TIME: {gameTime}s</span>
-                  {chainData.isRegistered && (
-                    <span className="text-cyan-400">{chainData.playerName}</span>
+                  {isRegistered && (
+                    <span className="text-cyan-400">{playerName}</span>
                   )}
-                </div>
-                
-                {/* 🚀 Initialize game button */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleInitializeGame}
-                    disabled={!isEstablished(sessionState)}
-                    className="px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 transition-all duration-300"
-                  >
-                    🚀 Init Game
-                  </button>
                 </div>
               </div>
 
@@ -278,7 +210,6 @@ export default function GamePage() {
               {/* 🎛️ GAME CONTROLS */}
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <div className="flex gap-4">
-                  {/* Start/Pause button */}
                   <button 
                     onClick={isPlaying ? handlePause : handleStart}
                     disabled={!isEstablished(sessionState) || !isRegistered}
@@ -287,7 +218,6 @@ export default function GamePage() {
                     {isPlaying ? "⏸️ PAUSE" : "🚀 START GAME"}
                   </button>
                   
-                  {/* Reset button */}
                   <button 
                     onClick={handleReset}
                     className="px-6 py-3 rounded-lg font-bold transition-all duration-300 hover:scale-105 active:scale-95 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
@@ -296,14 +226,13 @@ export default function GamePage() {
                   </button>
                 </div>
                 
-                {/* Controls guide */}
                 <p className="text-gray-400 text-sm text-center sm:text-left">
                   🎮 CONTROLS: ← → Move | SPACE Shoot
                 </p>
               </div>
             </div>
 
-            {/* 👤 PLAYER REGISTRATION SECTION */}
+            {/* 👤 PLAYER REGISTRATION */}
             <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 mt-6">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <span className="text-2xl">📝</span>
@@ -311,7 +240,6 @@ export default function GamePage() {
               </h3>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                {/* Name input */}
                 <input
                   type="text"
                   value={playerName}
@@ -322,7 +250,6 @@ export default function GamePage() {
                   disabled={isRegistered}
                 />
                 
-                {/* Register button */}
                 <button
                   onClick={handleRegister}
                   disabled={!isEstablished(sessionState) || playerName.length < 3 || isRegistered}
@@ -332,43 +259,22 @@ export default function GamePage() {
                 </button>
               </div>
               
-              {/* Registration status */}
               <p className="text-gray-400 text-sm mt-3">
                 {isRegistered 
-                  ? `✅ Registered as ${playerName} on-chain!`
-                  : "Register to save your score on-chain!"}
+                  ? `✅ Registered as ${playerName}!`
+                  : "Register to play!"}
               </p>
             </div>
           </div>
 
-          {/* 📈 RIGHT PANEL - PERFORMANCE DASHBOARD */}
+          {/* 📈 RIGHT PANEL */}
           <div className="lg:col-span-3">
             <PerformanceDashboard 
               sessionState={isEstablished(sessionState) ? sessionState : undefined}
               performanceStats={performanceStats}
-              chainData={chainData}
             />
           </div>
         </div>
-
-        {/* 📝 FOOTER */}
-        <footer className="mt-12 text-center text-gray-500 text-sm">
-          <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6">
-            <p className="text-gray-300">
-              Powered by <strong className="text-cyan-400">Fogo Sessions</strong> • 
-              Gasless transactions • 
-              <button 
-                className="ml-2 text-cyan-400 hover:text-cyan-300 transition-colors"
-                onClick={() => window.open("https://mainnet.fogo.io", "_blank")}
-              >
-                🌐 Fogo Mainnet Explorer
-              </button>
-            </p>
-            <p className="mt-2 text-amber-500/80">
-              ⚠️ Ensure Fogo Sessions is connected for gasless gameplay
-            </p>
-          </div>
-        </footer>
       </div>
     </div>
   );

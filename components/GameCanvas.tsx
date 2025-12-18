@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { type EstablishedSessionState } from '@fogo/sessions-sdk-react';
 import { FurboGameEngine } from '@/lib/FurboGameEngine';
 
@@ -12,6 +12,7 @@ interface GameCanvasProps {
   onGameTimeUpdate: (time: number) => void;
   onPerformanceUpdate: (stats: any) => void;
   onChainDataUpdate?: (data: any) => void;
+  onEngineReady?: (engine: any) => void; // Thêm prop mới
 }
 
 export default function GameCanvas({ 
@@ -21,17 +22,53 @@ export default function GameCanvas({
   onScoreUpdate,
   onGameTimeUpdate,
   onPerformanceUpdate,
-  onChainDataUpdate
+  onChainDataUpdate,
+  onEngineReady // Nhận callback
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameEngineRef = useRef<FurboGameEngine | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
+  // Hàm đăng ký player - xuất ra ngoài
+  const registerPlayer = useCallback(async (name: string) => {
+    if (!gameEngineRef.current) {
+      console.error("Game engine not ready");
+      return false;
+    }
+    
+    console.log("🔄 Registering player:", name);
+    gameEngineRef.current.setPlayerName(name);
+    return await gameEngineRef.current.registerPlayer();
+  }, []);
 
-    // Initialize game engine
-    gameEngineRef.current = new FurboGameEngine(
+  // Hàm start game - xuất ra ngoài
+  const startGame = useCallback(() => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.start();
+    }
+  }, []);
+
+  // Hàm pause game - xuất ra ngoài
+  const pauseGame = useCallback(() => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.pause();
+    }
+  }, []);
+
+  // Hàm reset game - xuất ra ngoài
+  const resetGame = useCallback(() => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.reset();
+    }
+  }, []);
+
+  // Khởi tạo game engine
+  useEffect(() => {
+    if (!canvasRef.current || gameEngineRef.current) return;
+
+    console.log("🎮 Initializing game engine...");
+
+    const engine = new FurboGameEngine(
       canvasRef.current,
       sessionState,
       {
@@ -42,22 +79,40 @@ export default function GameCanvas({
       }
     );
 
+    gameEngineRef.current = engine;
     setIsInitialized(true);
+    
+    // Gửi engine ra ngoài qua callback
+    if (onEngineReady) {
+      // Đóng gói engine với các phương thức cần thiết
+      const engineInterface = {
+        registerPlayer: (name: string) => registerPlayer(name),
+        start: startGame,
+        pause: pauseGame,
+        reset: resetGame,
+        getStats: () => gameEngineRef.current?.getStats(),
+        setPlayerName: (name: string) => gameEngineRef.current?.setPlayerName(name)
+      };
+      
+      onEngineReady(engineInterface);
+    }
 
     return () => {
-      gameEngineRef.current?.destroy();
+      console.log("🧹 Cleaning up game engine");
+      engine.destroy();
+      gameEngineRef.current = null;
       setIsInitialized(false);
     };
   }, []);
 
-  // Update session state
+  // Cập nhật session state
   useEffect(() => {
     if (gameEngineRef.current) {
       gameEngineRef.current.updateSession(sessionState);
     }
   }, [sessionState]);
 
-  // Update player name
+  // Cập nhật player name
   useEffect(() => {
     if (gameEngineRef.current && playerName) {
       gameEngineRef.current.setPlayerName(playerName);
@@ -74,21 +129,6 @@ export default function GameCanvas({
       }
     }
   }, [isPlaying]);
-
-  const registerPlayer = async () => {
-    if (gameEngineRef.current && playerName) {
-      const success = await gameEngineRef.current.registerPlayer();
-      if (success) {
-        console.log('✅ Player registered successfully!');
-      }
-    }
-  };
-
-  const startGame = () => {
-    if (gameEngineRef.current) {
-      gameEngineRef.current.start();
-    }
-  };
 
   return (
     <div className="relative">
@@ -166,7 +206,9 @@ export default function GameCanvas({
       <div className="mt-4 flex flex-wrap items-center justify-between text-sm">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <div className={`w-2 h-2 rounded-full ${
+              isInitialized ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+            }`} />
             <span className="text-gray-300">
               {isInitialized ? 'Game Ready' : 'Loading...'}
             </span>

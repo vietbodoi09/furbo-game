@@ -3,7 +3,7 @@ import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.j
 import { Buffer } from 'buffer';
 
 // 🔥 PROGRAM ID THỰC
-export const FURBO_PROGRAM_ID = new PublicKey('3LVJhB8fFqHQWuWF694R1U15ZP1SFuKRmwB8U5JbvUYY');
+export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWbWf3v7Jvhjsxawgzf28fAQvN3uf');
 
 // 🔥 PDAs HELPER FUNCTIONS
 export const getGameStatePDA = (): [PublicKey, number] => {

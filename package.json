@@ -14,8 +14,8 @@
     "@solana/web3.js": "1.98.4",
     "buffer": "6.0.3",
     "next": "15.0.0-canary.63",
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react": "19.0.0-rc.0",
+    "react-dom": "19.0.0-rc.0"
   },
   "devDependencies": {
     "@types/node": "20.11.24",

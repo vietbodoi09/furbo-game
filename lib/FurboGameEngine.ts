@@ -375,7 +375,7 @@ export class FurboGameEngine {
   start() {
     if (!this.isRegistered) {
       console.error("❌ Cannot start: Player not registered!");
-      alert("Vui lòng đăng ký player trước (nhấn Register)");
+      alert("❌ Cannot start: Player not registered!");
       return;
     }
     

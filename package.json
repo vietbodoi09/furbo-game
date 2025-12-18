@@ -16,6 +16,12 @@
     "buffer": "6.0.3",
     "crypto-browserify": "^3.12.0",
     "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "https-browserify": "^1.0.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "vm-browserify": "^1.1.2",
+    "browserify-zlib": "^0.2.0",
     "next": "14.2.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -26,7 +32,6 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
-    "pino-pretty": "^10.3.1",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2"
   }

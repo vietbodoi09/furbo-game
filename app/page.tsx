@@ -5,7 +5,7 @@ import { useSession, isEstablished, SessionButton } from "@fogo/sessions-sdk-rea
 import Leaderboard from "@/components/Leaderboard";
 import GameCanvas from "@/components/GameCanvas";
 import PerformanceDashboard from "@/components/PerformanceDashboard";
-import { FurboGameEngine } from "@/components/FurboGameEngine"; // ĐÃ THÊM
+import { FurboGameEngine } from "@/lib/FurboGameEngine"; // ĐÃ THÊM
 
 export default function GamePage() {
   // 🔗 Session state

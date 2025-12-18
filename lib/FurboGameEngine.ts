@@ -334,7 +334,7 @@ export class FurboGameEngine {
     this.fetchPlayerData();
   }
 
-import { connection } from "@/lib/solana/connection";
+
 
 private async fetchPlayerData() {
   if (!this.sessionState || !this.playerPDA) return;

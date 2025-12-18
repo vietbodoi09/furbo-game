@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession, isEstablished, SessionButton } from "@fogo/sessions-sdk-react";
-import Leaderboard from "@/components/Leaderboard";
-import GameCanvas from "@/components/GameCanvas";
-import PerformanceDashboard from "@/components/PerformanceDashboard";
-import { FurboGameEngine } from "@/lib/FurboGameEngine";
+import Leaderboard from "../components/Leaderboard";
+import GameCanvas from "../components/GameCanvas";
+import PerformanceDashboard from "../components/PerformanceDashboard";
+import { FurboGameEngine } from "../lib/FurboGameEngine";
 
 export default function GamePage() {
   const sessionState = useSession();

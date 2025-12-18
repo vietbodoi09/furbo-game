@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 import { connection } from "./connection";
 
 // 🔥 CRITICAL: USE YOUR PROGRAM ID
-export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf');
+export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
 
 // ⚠️ IMPORTANT: Discriminators must be extracted from Anchor IDL
 const DISCRIMINATORS = {

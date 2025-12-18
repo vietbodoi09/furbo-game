@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession, isEstablished, SessionButton } from "@fogo/sessions-sdk-react";
-import { FurboGameEngine } from "@/components/FurboGameEngine";
 import PerformanceDashboard from "@/components/PerformanceDashboard";
 import Leaderboard from "@/components/Leaderboard";
 

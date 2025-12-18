@@ -7,6 +7,7 @@ import Leaderboard from "../components/Leaderboard";
 import GameCanvas from "../components/GameCanvas";
 import PerformanceDashboard from "../components/PerformanceDashboard";
 import GameHeader from "../components/GameHeader";
+import TransactionFeed from "../components/TransactionFeed";
 import { FurboGameEngine } from "../lib/FurboGameEngine";
 
 export default function GamePage() {
@@ -41,6 +42,9 @@ export default function GamePage() {
     isRegistered: false
   });
 
+  // Transaction feed
+  const [transactions, setTransactions] = useState<any[]>([]);
+
   // Initialize game engine
   useEffect(() => {
     if (canvasRef.current && !gameEngine) {
@@ -58,6 +62,16 @@ export default function GamePage() {
           },
           onTransactionComplete: (type, success, signature) => {
             console.log(`${success ? '✅' : '❌'} ${type} transaction`);
+          },
+          onTransactionFeedUpdate: (transaction) => {
+            setTransactions(prev => [
+              {
+                id: Date.now().toString(),
+                ...transaction,
+                timestamp: Date.now()
+              },
+              ...prev.slice(0, 4) // Keep only 5 latest transactions
+            ]);
           }
         }
       );
@@ -149,14 +163,14 @@ export default function GamePage() {
 
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: Leaderboard - GIẢM từ 4 xuống 3 cột */}
+          {/* Left: Leaderboard */}
           <div className="lg:col-span-3">
             <Leaderboard />
           </div>
         
-          {/* Center: Game Area - TĂNG từ 5 lên 7 cột */}
-          <div className="lg:col-span-7">
-            {/* Game Canvas Container - Thêm padding và background */}
+          {/* Center: Game Area */}
+          <div className="lg:col-span-5">
+            {/* Game Canvas Container */}
             <div className="mb-6 bg-gray-900/20 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
               {/* Game Stats Header */}
               <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
@@ -190,7 +204,7 @@ export default function GamePage() {
                 </div>
               </div>
         
-              {/* Game Canvas - Đã to hơn */}
+              {/* Game Canvas */}
               <GameCanvas
                 sessionState={isEstablished(sessionState) ? sessionState : undefined}
                 isPlaying={isPlaying}
@@ -261,13 +275,21 @@ export default function GamePage() {
             </div>
           </div>
         
-          {/* Right: Performance Dashboard - GIẢM từ 3 xuống 2 cột */}
-          <div className="lg:col-span-2">
-            <PerformanceDashboard 
-              sessionState={isEstablished(sessionState) ? sessionState : undefined}
-              performanceStats={performanceStats}
-              chainData={chainData}
-            />
+          {/* Right: Transaction Feed và Performance Dashboard */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
+            {/* Transaction Feed - Hiển thị real-time transactions */}
+            <div className="h-[400px]">
+              <TransactionFeed />
+            </div>
+            
+            {/* Performance Dashboard - Thu gọn lại */}
+            <div className="h-[400px]">
+              <PerformanceDashboard 
+                sessionState={isEstablished(sessionState) ? sessionState : undefined}
+                performanceStats={performanceStats}
+                chainData={chainData}
+              />
+            </div>
           </div>
         </div>
       </div>

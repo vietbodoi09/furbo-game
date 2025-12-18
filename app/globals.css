@@ -1,56 +1,68 @@
-/* app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 10, 25, 41;
-  --background-end-rgb: 15, 30, 50;
+@layer base {
+  :root {
+    --neon-cyan: #00f3ff;
+    --neon-blue: #0066ff;
+    --neon-purple: #9d00ff;
+  }
+
+  * {
+    @apply border-gray-800;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom right,
-      rgb(var(--background-start-rgb)),
-      rgb(var(--background-end-rgb))
-    )
-    fixed;
-  min-height: 100vh;
-  overflow-x: hidden;
+@layer components {
+  .glass-panel {
+    @apply bg-gray-900/30 backdrop-blur-sm border border-gray-700/50 rounded-xl;
+  }
+
+  .neon-border {
+    @apply border border-cyan-500/30 shadow-[0_0_15px_rgba(0,243,255,0.3)];
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 rounded-lg font-bold transition-all duration-300 
+           hover:scale-105 active:scale-95 disabled:opacity-50 
+           disabled:cursor-not-allowed bg-gradient-to-r from-cyan-600 
+           to-blue-600 hover:from-cyan-700 hover:to-blue-700;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 rounded-lg font-bold transition-all duration-300 
+           hover:scale-105 active:scale-95 disabled:opacity-50 
+           disabled:cursor-not-allowed bg-gradient-to-r from-purple-600 
+           to-pink-600 hover:from-purple-700 hover:to-pink-700;
+  }
+
+  .stat-card {
+    @apply bg-gradient-to-br from-gray-900/50 to-gray-800/30 
+           border border-gray-700/30 rounded-xl p-4 backdrop-blur-sm;
+  }
 }
 
-/* Glass effect for panels */
-.glass-panel {
-  background: rgba(30, 41, 59, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(148, 163, 184, 0.1);
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(94, 234, 212, 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(94, 234, 212, 0.5);
-}
-
-/* Canvas glow effect */
-canvas {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }

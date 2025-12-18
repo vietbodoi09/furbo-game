@@ -149,15 +149,48 @@ export default function GamePage() {
 
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: Leaderboard */}
-          <div className="lg:col-span-4">
+          {/* Left: Leaderboard - GIẢM từ 4 xuống 3 cột */}
+          <div className="lg:col-span-3">
             <Leaderboard />
           </div>
-
-          {/* Center: Game Area */}
-          <div className="lg:col-span-5">
-            {/* Game Canvas */}
-            <div className="mb-6">
+        
+          {/* Center: Game Area - TĂNG từ 5 lên 7 cột */}
+          <div className="lg:col-span-7">
+            {/* Game Canvas Container - Thêm padding và background */}
+            <div className="mb-6 bg-gray-900/20 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
+              {/* Game Stats Header */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="text-xs text-gray-400 uppercase tracking-wider">SCORE</div>
+                    <div className="text-2xl font-bold text-yellow-400">{score}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-gray-400 uppercase tracking-wider">TIME</div>
+                    <div className="text-2xl font-bold text-green-400">{gameTime}s</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-gray-400 uppercase tracking-wider">KILLS</div>
+                    <div className="text-2xl font-bold text-red-400">{chainData.playerKills || 0}</div>
+                  </div>
+                  {isRegistered && (
+                    <div className="px-3 py-1 bg-cyan-900/30 border border-cyan-500/30 rounded-full">
+                      <span className="text-cyan-300 font-medium">{playerName}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isEstablished(sessionState) ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                  }`} />
+                  <span className="text-sm text-gray-300">
+                    {isEstablished(sessionState) ? '🟢 Connected' : '🔴 Disconnected'}
+                  </span>
+                </div>
+              </div>
+        
+              {/* Game Canvas - Đã to hơn */}
               <GameCanvas
                 sessionState={isEstablished(sessionState) ? sessionState : undefined}
                 isPlaying={isPlaying}
@@ -167,104 +200,69 @@ export default function GamePage() {
                 onPerformanceUpdate={setPerformanceStats}
                 onChainDataUpdate={setChainData}
               />
-            </div>
-
-            {/* Game Controls */}
-            <div className="bg-gray-900/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 mb-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap gap-3">
+        
+              {/* Game Controls */}
+              <div className="mt-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div className="flex gap-4">
                   <button 
                     onClick={isPlaying ? handlePause : handleStart}
                     disabled={!isEstablished(sessionState) || !isRegistered}
-                    className="btn-primary flex items-center gap-2 px-8 py-3 rounded-xl"
+                    className="px-8 py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
                   >
-                    {isPlaying ? (
-                      <>
-                        <Pause className="w-5 h-5" />
-                        PAUSE GAME
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-5 h-5" />
-                        START GAME
-                      </>
-                    )}
+                    {isPlaying ? "⏸️ PAUSE" : "🚀 START GAME"}
                   </button>
                   
                   <button 
                     onClick={handleReset}
-                    className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl"
+                    className="px-8 py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 active:scale-95 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                   >
-                    <RotateCcw className="w-5 h-5" />
-                    RESET
+                    🔄 RESET
                   </button>
                 </div>
                 
-                <div className="text-sm text-gray-300 bg-gray-800/50 px-4 py-2 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-red-400" />
-                    <span>Kills: {chainData.playerKills}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-purple-400" />
-                    <span>Shots: {chainData.playerShots}</span>
-                  </div>
+                <div className="text-sm text-gray-400 bg-gray-800/50 px-4 py-2 rounded-lg">
+                  🎮 CONTROLS: ← → Move | SPACE Shoot
                 </div>
               </div>
             </div>
-
-            {/* Registration */}
+        
+            {/* Registration Section */}
             <div className="bg-gradient-to-r from-gray-900/30 to-cyan-900/10 backdrop-blur-sm rounded-2xl p-6 border border-cyan-700/30">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-3">
-                <UserPlus className="w-6 h-6 text-cyan-400" />
+                <span className="text-xl">📝</span>
                 REGISTER PLAYER
               </h3>
               
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="Enter your gaming name (min 3 chars)"
-                    className="flex-1 px-4 py-3 bg-black/50 border border-gray-700 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 text-white placeholder-gray-500"
-                    maxLength={20}
-                    disabled={isRegistered}
-                  />
-                  
-                  <button
-                    onClick={handleRegister}
-                    disabled={!isEstablished(sessionState) || playerName.length < 3 || isRegistered}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-xl font-bold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {isRegistered ? "✅ REGISTERED" : "REGISTER NOW"}
-                  </button>
-                </div>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter your gaming name (min 3 chars)"
+                  className="flex-1 px-4 py-3 bg-black/50 border border-gray-700 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 text-white placeholder-gray-500"
+                  maxLength={20}
+                  disabled={isRegistered}
+                />
                 
-                <div className="text-sm space-y-2">
-                  {isRegistered ? (
-                    <div className="flex items-center gap-2 text-green-400">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      Registered as <span className="font-bold text-cyan-300">{playerName}</span>
-                    </div>
-                  ) : (
-                    <div className="text-gray-400">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-2 h-2 bg-yellow-400 rounded-full" />
-                        <span>Register to save your score permanently on-chain</span>
-                      </div>
-                      <div className="text-xs text-gray-500 ml-4">
-                        • Free registration • No gas fees • Global ranking
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={handleRegister}
+                  disabled={!isEstablished(sessionState) || playerName.length < 3 || isRegistered}
+                  className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-xl font-bold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isRegistered ? "✅ REGISTERED" : "REGISTER NOW"}
+                </button>
               </div>
+              
+              <p className="text-gray-400 text-sm mt-3">
+                {isRegistered 
+                  ? `✅ Registered as ${playerName}! Your scores are saved on-chain.`
+                  : "Register to save your score permanently on the blockchain!"}
+              </p>
             </div>
           </div>
-
-          {/* Right: Performance Dashboard */}
-          <div className="lg:col-span-3">
+        
+          {/* Right: Performance Dashboard - GIẢM từ 3 xuống 2 cột */}
+          <div className="lg:col-span-2">
             <PerformanceDashboard 
               sessionState={isEstablished(sessionState) ? sessionState : undefined}
               performanceStats={performanceStats}

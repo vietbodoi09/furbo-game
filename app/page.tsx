@@ -8,19 +8,19 @@ import GameCanvas from "../components/GameCanvas";
 import PerformanceDashboard from "../components/PerformanceDashboard";
 import GameHeader from "../components/GameHeader";
 import TransactionFeed from "../components/TransactionFeed";
-import { FurboGameEngine } from "../lib/FurboGameEngine";
 
 export default function GamePage() {
   const sessionState = useSession();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [gameEngine, setGameEngine] = useState<FurboGameEngine | null>(null);
   
-  // Game state
+  // Game state - LÀM ĐƠN GIẢN
   const [score, setScore] = useState(0);
   const [gameTime, setGameTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [isRegistered, setIsRegistered] = useState(false);
+  
+  // Thêm ref để lưu engine từ GameCanvas
+  const gameEngineRef = useRef<any>(null);
   
   // Performance metrics
   const [performanceStats, setPerformanceStats] = useState({
@@ -45,88 +45,58 @@ export default function GamePage() {
   // Transaction feed
   const [transactions, setTransactions] = useState<any[]>([]);
 
-  // Initialize game engine
-  useEffect(() => {
-    if (canvasRef.current && !gameEngine) {
-      const engine = new FurboGameEngine(
-        canvasRef.current,
-        isEstablished(sessionState) ? sessionState : undefined,
-        {
-          onScoreUpdate: (newScore) => setScore(newScore),
-          onGameTimeUpdate: (time) => setGameTime(time),
-          onPerformanceUpdate: (stats) => setPerformanceStats(stats),
-          onChainUpdate: (data) => {
-            setChainData(data);
-            setIsRegistered(data.isRegistered || false);
-            if (data.playerName) setPlayerName(data.playerName);
-          },
-          onTransactionComplete: (type, success, signature) => {
-            console.log(`${success ? '✅' : '❌'} ${type} transaction`);
-          },
-          onTransactionFeedUpdate: (transaction) => {
-            setTransactions(prev => [
-              {
-                id: Date.now().toString(),
-                ...transaction,
-                timestamp: Date.now()
-              },
-              ...prev.slice(0, 4) // Keep only 5 latest transactions
-            ]);
-          }
-        }
-      );
-      
-      setGameEngine(engine);
-      return () => {
-        engine.destroy();
-        setGameEngine(null);
-      };
-    }
-  }, [canvasRef.current, sessionState]);
-
-  // Update session when changed
-  useEffect(() => {
-    if (gameEngine) {
-      gameEngine.updateSession(isEstablished(sessionState) ? sessionState : undefined);
-    }
-  }, [sessionState, gameEngine]);
-
-  // Player registration
+  // Player registration - CHỈ GỌI KHI CÓ ENGINE
   const handleRegister = async () => {
-    if (!gameEngine || !playerName.trim()) return;
+    if (!gameEngineRef.current || !playerName.trim()) {
+      console.error("No game engine or invalid player name");
+      return;
+    }
     
-    gameEngine.setPlayerName(playerName);
-    const success = await gameEngine.registerPlayer();
+    console.log("📝 Attempting to register player:", playerName);
     
-    if (success) {
-      alert(`✅ Registered as: ${playerName}`);
-    } else {
-      alert("❌ Registration failed");
+    try {
+      const success = await gameEngineRef.current.registerPlayer(playerName);
+      
+      if (success) {
+        alert(`✅ Registered as: ${playerName}`);
+        setIsRegistered(true);
+      } else {
+        alert("❌ Registration failed. Check console for details.");
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      alert("❌ Registration error");
     }
   };
 
-  // Game controls
+  // Game controls - GỌI QUA ENGINE REF
   const handleStart = () => {
-    if (gameEngine) {
-      gameEngine.start();
+    if (gameEngineRef.current) {
+      gameEngineRef.current.start();
       setIsPlaying(true);
     }
   };
 
   const handlePause = () => {
-    if (gameEngine) {
-      gameEngine.pause();
+    if (gameEngineRef.current) {
+      gameEngineRef.current.pause();
       setIsPlaying(false);
     }
   };
 
   const handleReset = () => {
-    if (gameEngine) {
-      gameEngine.reset();
+    if (gameEngineRef.current) {
+      gameEngineRef.current.reset();
       setIsPlaying(false);
       setScore(0);
       setGameTime(0);
     }
+  };
+
+  // Callback nhận engine từ GameCanvas
+  const handleEngineReady = (engine: any) => {
+    console.log("🎮 Game engine ready from GameCanvas");
+    gameEngineRef.current = engine;
   };
 
   return (
@@ -151,14 +121,33 @@ export default function GamePage() {
             </div>
           </div>
 
-          <GameHeader
-            score={score}
-            gameTime={gameTime}
-            kills={chainData.playerKills}
-            shots={chainData.playerShots}
-            isConnected={isEstablished(sessionState)}
-            playerName={playerName}
-          />
+          {/* GameHeader component */}
+          <div className="glass-panel p-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="stat-card">
+                <div className="text-xs text-gray-400 uppercase tracking-wider">SCORE</div>
+                <div className="text-3xl font-bold text-yellow-400">{score}</div>
+              </div>
+              <div className="stat-card">
+                <div className="text-xs text-gray-400 uppercase tracking-wider">TIME</div>
+                <div className="text-3xl font-bold text-green-400">{gameTime}s</div>
+              </div>
+              <div className="stat-card">
+                <div className="text-xs text-gray-400 uppercase tracking-wider">KILLS</div>
+                <div className="text-3xl font-bold text-red-400">{chainData.playerKills || 0}</div>
+              </div>
+              <div className="stat-card">
+                <div className="text-xs text-gray-400 uppercase tracking-wider">SHOTS</div>
+                <div className="text-3xl font-bold text-blue-400">{chainData.playerShots || 0}</div>
+              </div>
+              <div className="stat-card">
+                <div className="text-xs text-gray-400 uppercase tracking-wider">STATUS</div>
+                <div className={`text-lg font-bold ${isRegistered ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {isRegistered ? `✅ ${playerName}` : 'Not Registered'}
+                </div>
+              </div>
+            </div>
+          </div>
         </header>
 
         {/* Main Layout */}
@@ -204,7 +193,7 @@ export default function GamePage() {
                 </div>
               </div>
         
-              {/* Game Canvas */}
+              {/* Game Canvas Component - THÊM CALLBACKS */}
               <GameCanvas
                 sessionState={isEstablished(sessionState) ? sessionState : undefined}
                 isPlaying={isPlaying}
@@ -213,6 +202,7 @@ export default function GamePage() {
                 onGameTimeUpdate={setGameTime}
                 onPerformanceUpdate={setPerformanceStats}
                 onChainDataUpdate={setChainData}
+                onEngineReady={handleEngineReady} // Thêm callback này
               />
         
               {/* Game Controls */}
@@ -277,18 +267,66 @@ export default function GamePage() {
         
           {/* Right: Transaction Feed và Performance Dashboard */}
           <div className="lg:col-span-4 flex flex-col gap-6">
-            {/* Transaction Feed - Hiển thị real-time transactions */}
+            {/* Transaction Feed */}
             <div className="h-[400px]">
-              <TransactionFeed />
+              <div className="glass-panel h-full p-4">
+                <h3 className="text-lg font-bold mb-4">📊 Transaction Feed</h3>
+                <div className="space-y-2">
+                  {transactions.length > 0 ? (
+                    transactions.map((tx) => (
+                      <div key={tx.id} className="p-3 bg-gray-800/30 rounded-lg">
+                        <div className="flex justify-between">
+                          <span className={`font-medium ${
+                            tx.status === 'confirmed' ? 'text-green-400' : 
+                            tx.status === 'pending' ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {tx.type}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(tx.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-300">{tx.message}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      No transactions yet
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
-            {/* Performance Dashboard - Thu gọn lại */}
+            {/* Performance Dashboard */}
             <div className="h-[400px]">
-              <PerformanceDashboard 
-                sessionState={isEstablished(sessionState) ? sessionState : undefined}
-                performanceStats={performanceStats}
-                chainData={chainData}
-              />
+              <div className="glass-panel h-full p-4">
+                <h3 className="text-lg font-bold mb-4">⚡ Performance</h3>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm text-gray-400">Success Rate</div>
+                    <div className="text-2xl font-bold text-green-400">
+                      {performanceStats.successRate}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-400">Avg Confirmation</div>
+                    <div className="text-2xl font-bold text-blue-400">
+                      {performanceStats.avgConfirm}ms
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-400">Moves</div>
+                      <div className="text-xl">{performanceStats.movesSent}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-400">Shots</div>
+                      <div className="text-xl">{performanceStats.shotsSent}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,10 +1,11 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useSession, isEstablished, SessionButton } from "@fogo/sessions-sdk-react";
-import PerformanceDashboard from "@/components/PerformanceDashboard";
 import Leaderboard from "@/components/Leaderboard";
+import GameCanvas from "@/components/GameCanvas";
+import PerformanceDashboard from "@/components/PerformanceDashboard";
 
 export default function GamePage() {
   // 🔗 Session state

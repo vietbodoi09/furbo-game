@@ -1,6 +1,7 @@
 import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
 import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.js';
 import { Buffer } from 'buffer';
+import { connection } from "./connection";
 
 // 🔥 PROGRAM ID THỰC
 export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWbWf3v7Jvhjsxawgzf28fAQvN3uf');
@@ -333,40 +334,46 @@ export class FurboGameEngine {
     this.fetchPlayerData();
   }
 
-  private async fetchPlayerData() {
-    if (!this.sessionState || !this.playerPDA) return;
-    
-    try {
-      const connection = this.sessionState.connection;
-      const accountInfo = await connection.getAccountInfo(this.playerPDA);
-      
-      if (accountInfo?.data) {
-        // In thực tế cần decode đúng format
-        this.isRegistered = true;
-        this.playerName = "Loaded Player"; // Placeholder
-        this.score = 0;
-        this.kills = 0;
-        this.shots = 0;
-        
-        this.callbacks.onChainUpdate({
-          playerScore: 0,
-          playerKills: 0,
-          playerShots: 0,
-          playerName: "Loaded Player",
-          isRegistered: true
-        });
-        
-        console.log('Player data loaded from chain');
-      } else {
-        console.log('Player not registered on chain yet');
-        this.callbacks.onChainUpdate({
-          isRegistered: false
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching player data:', error);
+import { connection } from "@/lib/solana/connection";
+
+private async fetchPlayerData() {
+  if (!this.sessionState || !this.playerPDA) return;
+
+  try {
+    // ✅ DÙNG connection GLOBAL
+    const accountInfo = await connection.getAccountInfo(this.playerPDA);
+
+    if (!accountInfo) {
+      console.log("Player not registered on chain yet");
+
+      this.callbacks.onChainUpdate({
+        isRegistered: false,
+      });
+
+      return;
     }
+
+    // ⚠️ Placeholder logic giữ nguyên
+    this.isRegistered = true;
+    this.playerName = "Loaded Player";
+    this.score = 0;
+    this.kills = 0;
+    this.shots = 0;
+
+    this.callbacks.onChainUpdate({
+      playerScore: 0,
+      playerKills: 0,
+      playerShots: 0,
+      playerName: "Loaded Player",
+      isRegistered: true,
+    });
+
+    console.log("Player data loaded from chain");
+  } catch (error) {
+    console.error("Error fetching player data:", error);
   }
+}
+
 
   async updateSessionKey(): Promise<boolean> {
     if (!this.sessionState || !this.playerPDA) return false;

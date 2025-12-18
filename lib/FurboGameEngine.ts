@@ -288,6 +288,17 @@ export class FurboGameEngine {
   // ✅ FIXED: HÀM REGISTER ĐÚNG
   async registerPlayer(): Promise<boolean> {
     console.log("🎯 ====== REGISTER PLAYER CALLED ======");
+    console.log("🔍 Session State:", {
+      exists: !!this.sessionState,
+      wallet: this.sessionState?.walletPublicKey.toString(),
+      sessionKey: this.sessionState?.sessionPublicKey.toString(),
+      canSign: this.sessionState?.canSignTransactions
+    });
+    if (!this.sessionState?.canSignTransactions) {
+      console.error("❌ Session cannot sign transactions!");
+      console.log("⚠️ Try reconnecting wallet");
+      return false;
+    }
     console.log("1. Checking session state...");
     
     if (!this.sessionState) {

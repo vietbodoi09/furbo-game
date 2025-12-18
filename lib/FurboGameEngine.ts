@@ -1,6 +1,4 @@
-// ==============================================
-// FILE: FurboGameEngine.ts - COMPLETE WORKING VERSION
-// ==============================================
+
 
 import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
 import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.js';

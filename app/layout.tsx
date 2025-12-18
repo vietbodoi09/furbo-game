@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <FogoSessionProvider
           network={Network.Mainnet}
           domain={process.env.NODE_ENV === "production" 
-            ? "https://www.furbocoin.meme/" 
+            ? "https://furbocoin.meme" 
             : "http://localhost:3000"}
           tokens={[NATIVE_MINT.toBase58()]}
           defaultRequestedLimits={{

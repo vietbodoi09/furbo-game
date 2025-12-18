@@ -37,6 +37,13 @@ export interface GameCallbacks {
   onPerformanceUpdate: (stats: any) => void;
   onChainUpdate: (data: ChainData) => void;
   onTransactionComplete?: (type: string, success: boolean, signature?: string) => void;
+  onTransactionFeedUpdate?: (transaction: {
+    type: 'move' | 'shoot' | 'kill' | 'register' | 'end_game' | 'update_session';
+    status: 'pending' | 'confirmed' | 'failed';
+    signature?: string;
+    message: string;
+    details?: string;
+  }) => void;
 }
 
 // 🔥 FIXED INSTRUCTION BUILDERS - CHUẨN XÁC VỚI RUST PROGRAM
@@ -653,10 +660,30 @@ export class FurboGameEngine {
   private async sendTransaction(instruction: TransactionInstruction, type: string): Promise<string | null> {
     if (!this.sessionState) {
       this.callbacks.onTransactionComplete?.(type, false);
+      this.callbacks.onTransactionFeedUpdate?.({
+        type: type as any,
+        status: 'failed',
+        message: `${type.replace('_', ' ')} failed`,
+        details: 'Wallet not connected'
+      });      
       return null;
     }
 
     const startTime = performance.now();
+
+    const actionType = type === 'move' ? 'move' : 
+                   type === 'shoot' ? 'shoot' : 
+                   type === 'kill' ? 'kill' : 
+                   type === 'register_player' ? 'register' : 
+                   type === 'end_game' ? 'end_game' : 'update_session';
+    this.callbacks.onTransactionFeedUpdate?.({
+        type: actionType,
+        status: 'pending',
+        message: `${actionType.replace('_', ' ')} sending...`,
+        details: type === 'move' ? `position: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})` : 
+                 type === 'shoot' ? `shots: ${this.shots}` :
+                 type === 'kill' ? `total kills: ${this.kills}` : undefined
+      });
 
     try {
       this.performanceStats.pendingTx++;
@@ -667,7 +694,24 @@ export class FurboGameEngine {
       
       const confirmTime = performance.now() - startTime;
       this.performanceStats.confirmationTimes.push(confirmTime);
-      
+
+      this.callbacks.onTransactionFeedUpdate?.({
+        type: actionType,
+        status: 'confirmed',
+        signature: signature,
+        message: type === 'move' ? 'Move action confirmed' :
+                 type === 'shoot' ? 'Shoot action confirmed' :
+                 type === 'kill' ? 'Enemy killed! +100 points' :
+                 type === 'register_player' ? 'Player registered successfully' :
+                 type === 'end_game' ? 'Game saved to blockchain' :
+                 'Session updated',
+        details: type === 'move' ? `position: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})` : 
+                 type === 'shoot' ? `total shots: ${this.shots}` :
+                 type === 'kill' ? `total kills: ${this.kills}` :
+                 type === 'register_player' ? `name: ${this.playerName}` :
+                 type === 'end_game' ? `final score: ${this.score}` :
+                 'session key updated'
+      });    
       // Keep only last 50 confirmation times
       if (this.performanceStats.confirmationTimes.length > 50) {
         this.performanceStats.confirmationTimes.shift();
@@ -690,6 +734,13 @@ export class FurboGameEngine {
       
       console.error(`❌ ${type} tx failed:`, error);
       this.callbacks.onTransactionComplete?.(type, false);
+
+      this.callbacks.onTransactionFeedUpdate?.({
+        type: actionType,
+        status: 'failed',
+        message: `${actionType.replace('_', ' ')} failed`,
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
       
       return null;
     }

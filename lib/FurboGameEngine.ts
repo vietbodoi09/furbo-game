@@ -21,21 +21,7 @@ export const getPlayerPDA = (wallet: PublicKey): [PublicKey, number] => {
   );
 };
 
-// 🔥 TYPES (Đặt lên trước)
-export interface GameData {
-  action_type: number;
-  x: number;
-  y: number;
-  direction: number;
-  timestamp: number;
-}
-
-export interface BatchAction {
-  action_type: number;
-  timestamp: number;
-  data: Buffer;
-}
-
+// 🔥 TYPES
 export interface ChainData {
   playerScore?: number;
   playerKills?: number;
@@ -53,13 +39,15 @@ export interface GameCallbacks {
   onTransactionComplete?: (type: string, success: boolean, signature?: string) => void;
 }
 
-// 🔥 MANUAL INSTRUCTION BUILDERS CHUẨN XÁC
+// 🔥 FIXED INSTRUCTION BUILDERS - CHUẨN XÁC VỚI RUST PROGRAM
+
+// Index 0: initialize_game
 export const createInitializeGameIx = (
   gameStatePDA: PublicKey,
   authority: PublicKey
 ): TransactionInstruction => {
-  const data = Buffer.alloc(8);
-  data.writeUInt8(0, 0);
+  const data = Buffer.alloc(1); // Chỉ 1 byte cho instruction index
+  data.writeUInt8(0, 0); // Index 0
   
   const keys = [
     { pubkey: gameStatePDA, isSigner: false, isWritable: true },
@@ -74,6 +62,7 @@ export const createInitializeGameIx = (
   });
 };
 
+// Index 1: register_player
 export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -82,13 +71,13 @@ export const createRegisterPlayerIx = (
   sessionKey: PublicKey
 ): TransactionInstruction => {
   const nameBuffer = Buffer.from(name, 'utf8');
-  const data = Buffer.alloc(8 + 4 + nameBuffer.length + 32);
+  const data = Buffer.alloc(1 + 4 + nameBuffer.length + 32);
   let offset = 0;
   
-  data.writeUInt8(1, offset); offset += 1;
-  data.writeUInt32LE(nameBuffer.length, offset); offset += 4;
-  nameBuffer.copy(data, offset); offset += nameBuffer.length;
-  sessionKey.toBuffer().copy(data, offset); offset += 32;
+  data.writeUInt8(1, offset); offset += 1; // Index 1
+  data.writeUInt32LE(nameBuffer.length, offset); offset += 4; // Name length
+  nameBuffer.copy(data, offset); offset += nameBuffer.length; // Name bytes
+  sessionKey.toBuffer().copy(data, offset); offset += 32; // Session key
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -104,16 +93,17 @@ export const createRegisterPlayerIx = (
   });
 };
 
+// Index 2: update_session
 export const createUpdateSessionIx = (
   playerPDA: PublicKey,
   authority: PublicKey,
   newSessionKey: PublicKey
 ): TransactionInstruction => {
-  const data = Buffer.alloc(8 + 32);
+  const data = Buffer.alloc(1 + 32);
   let offset = 0;
   
-  data.writeUInt8(2, offset); offset += 1;
-  newSessionKey.toBuffer().copy(data, offset); offset += 32;
+  data.writeUInt8(2, offset); offset += 1; // Index 2
+  newSessionKey.toBuffer().copy(data, offset); offset += 32; // New session key
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -127,26 +117,24 @@ export const createUpdateSessionIx = (
   });
 };
 
+// Index 3: game_action - FIXED! (5 bytes: 1 + 1 + 2 + 2)
 export const createGameActionIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
   signer: PublicKey,
-  actionType: number,
-  gameData: GameData
+  actionType: number, // 0=Move, 1=Shoot, 2=Kill
+  x: number, // 0-65535
+  y: number  // 0-65535
 ): TransactionInstruction => {
-  const data = Buffer.alloc(8 + 1 + 14);
+  const data = Buffer.alloc(5); // Chỉ 5 bytes!
   let offset = 0;
   
-  data.writeUInt8(3, offset); offset += 1;
-  data.writeUInt8(actionType, offset); offset += 1;
-  data.writeUInt8(gameData.action_type, offset); offset += 1;
-  data.writeUInt16LE(gameData.x, offset); offset += 2;
-  data.writeUInt16LE(gameData.y, offset); offset += 2;
-  data.writeUInt8(gameData.direction, offset); offset += 1;
+  data.writeUInt8(3, offset); offset += 1; // Index 3
+  data.writeUInt8(actionType, offset); offset += 1; // Action type (1 byte)
+  data.writeUInt16LE(x, offset); offset += 2; // X (2 bytes)
+  data.writeUInt16LE(y, offset); offset += 2; // Y (2 bytes)
   
-  const timestampBuffer = Buffer.alloc(8);
-  timestampBuffer.writeBigInt64LE(BigInt(gameData.timestamp));
-  timestampBuffer.copy(data, offset); offset += 8;
+  console.log(`Game action data: ${data.toString('hex')}`);
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -161,6 +149,7 @@ export const createGameActionIx = (
   });
 };
 
+// Index 4: end_game
 export const createEndGameIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -169,13 +158,13 @@ export const createEndGameIx = (
   finalKills: number,
   finalShots: number
 ): TransactionInstruction => {
-  const data = Buffer.alloc(8 + 8 + 4 + 4);
+  const data = Buffer.alloc(1 + 8 + 4 + 4);
   let offset = 0;
   
-  data.writeUInt8(4, offset); offset += 1;
-  data.writeBigUInt64LE(BigInt(finalScore), offset); offset += 8;
-  data.writeUInt32LE(finalKills, offset); offset += 4;
-  data.writeUInt32LE(finalShots, offset); offset += 4;
+  data.writeUInt8(4, offset); offset += 1; // Index 4
+  data.writeBigUInt64LE(BigInt(finalScore), offset); offset += 8; // Score
+  data.writeUInt32LE(finalKills, offset); offset += 4; // Kills
+  data.writeUInt32LE(finalShots, offset); offset += 4; // Shots
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -190,33 +179,26 @@ export const createEndGameIx = (
   });
 };
 
+// Index 5: batch_actions
 export const createBatchActionsIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
   signer: PublicKey,
-  actions: BatchAction[]
+  actions: Array<{ action_type: number, timestamp: number }>
 ): TransactionInstruction => {
-  // Calculate total data size
-  let actionsDataSize = 0;
-  actions.forEach(action => {
-    actionsDataSize += 1 + 8 + 4 + action.data.length;
-  });
-  
-  const data = Buffer.alloc(8 + 4 + actionsDataSize);
+  // Mỗi action: 1 byte (action_type) + 8 bytes (timestamp)
+  const data = Buffer.alloc(1 + 4 + (actions.length * 9));
   let offset = 0;
   
-  data.writeUInt8(5, offset); offset += 1;
-  data.writeUInt32LE(actions.length, offset); offset += 4;
+  data.writeUInt8(5, offset); offset += 1; // Index 5
+  data.writeUInt32LE(actions.length, offset); offset += 4; // Number of actions
   
   for (const action of actions) {
-    data.writeUInt8(action.action_type, offset); offset += 1;
+    data.writeUInt8(action.action_type, offset); offset += 1; // Action type
     
     const timestampBuffer = Buffer.alloc(8);
     timestampBuffer.writeBigInt64LE(BigInt(action.timestamp));
-    timestampBuffer.copy(data, offset); offset += 8;
-    
-    data.writeUInt32LE(action.data.length, offset); offset += 4;
-    action.data.copy(data, offset); offset += action.data.length;
+    timestampBuffer.copy(data, offset); offset += 8; // Timestamp
   }
   
   const keys = [
@@ -232,7 +214,7 @@ export const createBatchActionsIx = (
   });
 };
 
-// 🔥 MAIN GAME ENGINE CLASS
+// 🔥 MAIN GAME ENGINE CLASS - REAL-TIME VERSION
 export class FurboGameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -252,8 +234,8 @@ export class FurboGameEngine {
   private isRegistered: boolean = false;
   private kills: number = 0;
   private shots: number = 0;
-  private pendingActions: BatchAction[] = [];
   
+  // Performance tracking
   private performanceStats = {
     movesSent: 0,
     shotsSent: 0,
@@ -261,15 +243,20 @@ export class FurboGameEngine {
     avgConfirm: 0,
     successRate: 100,
     pendingTx: 0,
-    chainSpeed: 0,
-    confirmationTimes: [] as number[]
+    confirmationTimes: [] as number[],
+    totalActions: 0,
+    failedActions: 0
   };
 
+  // Chain state
   private playerPDA?: PublicKey;
   private gameStatePDA?: PublicKey;
-  private lastChainUpdate: number = 0;
-  private lastBatchTime: number = 0;
-  private batchInterval: number = 5000;
+  
+  // Debouncing
+  private lastMoveTime: number = 0;
+  private moveDebounceMs: number = 500; // Send move every 500ms max
+  private lastKillTime: number = 0;
+  private killDebounceMs: number = 100; // Minimal delay between kills
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -285,6 +272,7 @@ export class FurboGameEngine {
     this.sessionState = sessionState;
     this.callbacks = callbacks;
     
+    // Player setup
     this.player = {
       x: canvas.width / 2 - 35,
       y: canvas.height - 100,
@@ -300,8 +288,6 @@ export class FurboGameEngine {
     this.setupEventListeners();
     this.initializeChainState();
     this.render();
-    
-    this.startBatchProcessing();
   }
 
   updateSession(sessionState: EstablishedSessionState | undefined) {
@@ -311,6 +297,7 @@ export class FurboGameEngine {
     if (sessionState && oldSessionState?.walletPublicKey.toString() !== sessionState.walletPublicKey.toString()) {
       this.initializeChainState();
       
+      // Update session key on chain if already registered
       if (this.isRegistered && this.playerPDA) {
         this.updateSessionKey();
       }
@@ -334,46 +321,38 @@ export class FurboGameEngine {
     this.fetchPlayerData();
   }
 
+  private async fetchPlayerData() {
+    if (!this.sessionState || !this.playerPDA) return;
 
+    try {
+      const accountInfo = await connection.getAccountInfo(this.playerPDA);
 
-private async fetchPlayerData() {
-  if (!this.sessionState || !this.playerPDA) return;
+      if (!accountInfo) {
+        console.log("Player not registered on chain yet");
+        this.isRegistered = false;
+        
+        this.callbacks.onChainUpdate({
+          isRegistered: false,
+        });
+        return;
+      }
 
-  try {
-    // ✅ DÙNG connection GLOBAL
-    const accountInfo = await connection.getAccountInfo(this.playerPDA);
-
-    if (!accountInfo) {
-      console.log("Player not registered on chain yet");
-
+      // TODO: Parse actual player data from account
+      this.isRegistered = true;
+      
       this.callbacks.onChainUpdate({
-        isRegistered: false,
+        playerScore: 0,
+        playerKills: 0,
+        playerShots: 0,
+        playerName: this.playerName,
+        isRegistered: true,
       });
 
-      return;
+      console.log("Player data loaded from chain");
+    } catch (error) {
+      console.error("Error fetching player data:", error);
     }
-
-    // ⚠️ Placeholder logic giữ nguyên
-    this.isRegistered = true;
-    this.playerName = "Loaded Player";
-    this.score = 0;
-    this.kills = 0;
-    this.shots = 0;
-
-    this.callbacks.onChainUpdate({
-      playerScore: 0,
-      playerKills: 0,
-      playerShots: 0,
-      playerName: "Loaded Player",
-      isRegistered: true,
-    });
-
-    console.log("Player data loaded from chain");
-  } catch (error) {
-    console.error("Error fetching player data:", error);
   }
-}
-
 
   async updateSessionKey(): Promise<boolean> {
     if (!this.sessionState || !this.playerPDA) return false;
@@ -444,8 +423,6 @@ private async fetchPlayerData() {
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
-    this.lastChainUpdate = Date.now();
-    this.lastBatchTime = Date.now();
     this.gameLoop();
   }
 
@@ -453,9 +430,8 @@ private async fetchPlayerData() {
     this.isRunning = false;
     if (this.gameLoopId) {
       cancelAnimationFrame(this.gameLoopId);
+      this.gameLoopId = undefined;
     }
-    
-    this.flushPendingActions();
   }
 
   reset() {
@@ -465,7 +441,6 @@ private async fetchPlayerData() {
     this.shots = 0;
     this.bullets = [];
     this.enemies = [];
-    this.pendingActions = [];
     this.player.x = this.canvas.width / 2 - 35;
     this.callbacks.onScoreUpdate(this.score);
     this.callbacks.onGameTimeUpdate(0);
@@ -481,32 +456,46 @@ private async fetchPlayerData() {
 
   private update() {
     const currentTime = Date.now();
-    this.gameTime += 16;
+    this.gameTime += 16; // ~60 FPS
     
+    let moved = false;
+    
+    // Handle movement - REALTIME
     if (this.keysPressed['ArrowLeft']) {
       this.player.x = Math.max(0, this.player.x - this.player.speed);
-      if (currentTime % 100 === 0) {
-        this.addPendingAction(0, 'left');
-      }
+      moved = true;
     }
     
     if (this.keysPressed['ArrowRight']) {
       this.player.x = Math.min(this.canvas.width - this.player.width, this.player.x + this.player.speed);
-      if (currentTime % 100 === 0) {
-        this.addPendingAction(0, 'right');
-      }
+      moved = true;
     }
     
+    // Send move action with debouncing
+    if (moved && currentTime - this.lastMoveTime > this.moveDebounceMs) {
+      this.sendMoveAction();
+      this.lastMoveTime = currentTime;
+    }
+    
+    // Update bullets
     this.bullets = this.bullets.filter(bullet => {
       bullet.y -= bullet.speed;
       
+      // Check for collisions with enemies
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const enemy = this.enemies[i];
         if (this.checkCollision(bullet, enemy)) {
           this.enemies.splice(i, 1);
           this.score += 100;
           this.kills++;
-          this.addPendingAction(2, 'kill');
+          
+          // Send kill action - REALTIME
+          if (currentTime - this.lastKillTime > this.killDebounceMs) {
+            this.sendKillAction();
+            this.lastKillTime = currentTime;
+          }
+          
+          this.callbacks.onScoreUpdate(this.score);
           return false;
         }
       }
@@ -514,10 +503,12 @@ private async fetchPlayerData() {
       return bullet.y > -bullet.height;
     });
     
+    // Spawn enemies randomly
     if (Math.random() < 0.02 && this.enemies.length < 10) {
       this.spawnEnemy();
     }
     
+    // Update enemies
     this.enemies = this.enemies.filter(enemy => {
       enemy.y += enemy.speed;
       
@@ -529,13 +520,7 @@ private async fetchPlayerData() {
       return enemy.y < this.canvas.height;
     });
     
-    this.callbacks.onScoreUpdate(this.score);
     this.callbacks.onGameTimeUpdate(Math.floor(this.gameTime / 1000));
-    
-    if (currentTime - this.lastBatchTime > this.batchInterval) {
-      this.flushPendingActions();
-      this.lastBatchTime = currentTime;
-    }
   }
 
   private spawnEnemy() {
@@ -549,64 +534,34 @@ private async fetchPlayerData() {
     this.enemies.push(enemy);
   }
 
-  private addPendingAction(actionType: number, direction: string = '') {
-    if (!this.sessionState || !this.isRegistered) return;
-    
-    const actionData = Buffer.alloc(1);
-    actionData.writeUInt8(direction === 'left' ? 0 : 1, 0);
-    
-    this.pendingActions.push({
-      action_type: actionType,
-      timestamp: Math.floor(Date.now() / 1000),
-      data: actionData
-    });
-    
-    if (actionType === 0) this.performanceStats.movesSent++;
-    if (actionType === 1) this.performanceStats.shotsSent++;
-    if (actionType === 2) this.performanceStats.killsSent++;
-    
-    this.updatePerformance();
-  }
+  // ========== REALTIME ACTION FUNCTIONS ==========
 
-  private async flushPendingActions() {
-    if (this.pendingActions.length === 0 || !this.sessionState || !this.playerPDA || !this.gameStatePDA) {
-      return;
-    }
+  private async sendMoveAction(): Promise<void> {
+    if (!this.canSendAction()) return;
     
     try {
-      const actions = [...this.pendingActions];
-      this.pendingActions = [];
-      
-      const instruction = createBatchActionsIx(
-        this.playerPDA,
-        this.gameStatePDA,
-        this.sessionState.sessionPublicKey,
-        actions
+      const instruction = createGameActionIx(
+        this.playerPDA!,
+        this.gameStatePDA!,
+        this.sessionState!.sessionPublicKey,
+        0, // action_type = 0 (Move)
+        Math.floor(this.player.x),
+        Math.floor(this.player.y)
       );
       
-      await this.sendTransaction(instruction, 'batch_actions');
+      await this.sendTransaction(instruction, 'move');
+      this.performanceStats.movesSent++;
+      this.updatePerformance();
       
     } catch (error) {
-      console.error('Failed to send batch actions:', error);
+      console.error('Failed to send move action:', error);
     }
-  }
-
-  private checkCollision(rect1: any, rect2: any): boolean {
-    return rect1.x < rect2.x + rect2.width &&
-           rect1.x + rect1.width > rect2.x &&
-           rect1.y < rect2.y + rect2.height &&
-           rect1.y + rect1.height > rect2.y;
-  }
-
-  private gameOver() {
-    this.isRunning = false;
-    this.pause();
-    this.sendGameOverToChain();
   }
 
   async shoot(): Promise<void> {
-    if (!this.isRunning) return;
+    if (!this.isRunning || !this.canSendAction()) return;
 
+    // Add bullet visually
     this.bullets.push({
       x: this.player.x + this.player.width / 2 - 4,
       y: this.player.y - 20,
@@ -616,7 +571,51 @@ private async fetchPlayerData() {
     });
 
     this.shots++;
-    this.addPendingAction(1, 'shoot');
+    
+    // Send shoot action - REALTIME
+    try {
+      const instruction = createGameActionIx(
+        this.playerPDA!,
+        this.gameStatePDA!,
+        this.sessionState!.sessionPublicKey,
+        1, // action_type = 1 (Shoot)
+        Math.floor(this.player.x),
+        Math.floor(this.player.y)
+      );
+      
+      await this.sendTransaction(instruction, 'shoot');
+      this.performanceStats.shotsSent++;
+      this.updatePerformance();
+      
+    } catch (error) {
+      console.error('Failed to send shoot action:', error);
+    }
+  }
+
+  private async sendKillAction(): Promise<void> {
+    if (!this.canSendAction()) return;
+    
+    try {
+      const instruction = createGameActionIx(
+        this.playerPDA!,
+        this.gameStatePDA!,
+        this.sessionState!.sessionPublicKey,
+        2, // action_type = 2 (Kill)
+        Math.floor(this.player.x),
+        Math.floor(this.player.y)
+      );
+      
+      await this.sendTransaction(instruction, 'kill');
+      this.performanceStats.killsSent++;
+      this.updatePerformance();
+      
+    } catch (error) {
+      console.error('Failed to send kill action:', error);
+    }
+  }
+
+  private canSendAction(): boolean {
+    return !!(this.sessionState && this.isRegistered && this.playerPDA && this.gameStatePDA);
   }
 
   private async sendGameOverToChain() {
@@ -634,6 +633,7 @@ private async fetchPlayerData() {
 
       await this.sendTransaction(instruction, 'end_game');
       
+      // Reset local stats after saving to chain
       this.score = 0;
       this.kills = 0;
       this.shots = 0;
@@ -642,6 +642,12 @@ private async fetchPlayerData() {
     } catch (error) {
       console.error('Failed to save game over:', error);
     }
+  }
+
+  private gameOver() {
+    this.isRunning = false;
+    this.pause();
+    this.sendGameOverToChain();
   }
 
   private async sendTransaction(instruction: TransactionInstruction, type: string): Promise<string | null> {
@@ -654,6 +660,7 @@ private async fetchPlayerData() {
 
     try {
       this.performanceStats.pendingTx++;
+      this.performanceStats.totalActions++;
       this.updatePerformance();
       
       const signature = await this.sessionState.sendTransaction([instruction]);
@@ -661,6 +668,7 @@ private async fetchPlayerData() {
       const confirmTime = performance.now() - startTime;
       this.performanceStats.confirmationTimes.push(confirmTime);
       
+      // Keep only last 50 confirmation times
       if (this.performanceStats.confirmationTimes.length > 50) {
         this.performanceStats.confirmationTimes.shift();
       }
@@ -669,12 +677,15 @@ private async fetchPlayerData() {
       this.updatePerformance();
       
       console.log(`✅ ${type} tx confirmed in ${confirmTime.toFixed(0)}ms: ${signature}`);
+      console.log(`   Signature: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+      
       this.callbacks.onTransactionComplete?.(type, true, signature);
       
       return signature;
       
     } catch (error) {
       this.performanceStats.pendingTx--;
+      this.performanceStats.failedActions++;
       this.updatePerformance();
       
       console.error(`❌ ${type} tx failed:`, error);
@@ -684,35 +695,24 @@ private async fetchPlayerData() {
     }
   }
 
-  private startBatchProcessing() {
-    setInterval(() => {
-      if (this.isRunning && this.pendingActions.length > 0) {
-        this.flushPendingActions();
-      }
-    }, this.batchInterval);
-  }
-
   private updatePerformance() {
+    // Calculate average confirmation time
     if (this.performanceStats.confirmationTimes.length > 0) {
-      this.performanceStats.avgConfirm = Math.floor(
-        this.performanceStats.confirmationTimes.reduce((a, b) => a + b, 0) /
-        this.performanceStats.confirmationTimes.length
-      );
+      const sum = this.performanceStats.confirmationTimes.reduce((a, b) => a + b, 0);
+      this.performanceStats.avgConfirm = Math.floor(sum / this.performanceStats.confirmationTimes.length);
     }
     
-    const totalTransactions = this.performanceStats.movesSent + 
-                             this.performanceStats.shotsSent + 
-                             this.performanceStats.killsSent;
+    // Calculate success rate
+    const totalAttempted = this.performanceStats.totalActions;
+    const successful = this.performanceStats.confirmationTimes.length;
+    this.performanceStats.successRate = totalAttempted > 0 ? 
+      Math.round((successful / totalAttempted) * 100) : 100;
     
-    const successfulTransactions = this.performanceStats.confirmationTimes.length;
-    this.performanceStats.successRate = totalTransactions > 0 ? 
-      Math.min((successfulTransactions / totalTransactions) * 100, 100) : 100;
-    
-    const recentActivity = this.pendingActions.length;
-    this.performanceStats.chainSpeed = Math.min(100 - (recentActivity * 5), 100);
-    
+    // Send update to UI
     this.callbacks.onPerformanceUpdate({ ...this.performanceStats });
   }
+
+  // ========== RENDERING ==========
 
   private render() {
     this.ctx.fillStyle = '#0a1929';
@@ -823,12 +823,6 @@ private async fetchPlayerData() {
       this.ctx.font = '16px Arial';
       this.ctx.fillText(`${this.playerName}`, 20, 135);
     }
-    
-    if (this.pendingActions.length > 0) {
-      this.ctx.fillStyle = '#ffde59';
-      this.ctx.font = '12px Arial';
-      this.ctx.fillText(`📤 ${this.pendingActions.length} pending`, 20, 155);
-    }
   }
 
   private drawConnectionStatus() {
@@ -856,6 +850,8 @@ private async fetchPlayerData() {
     }
   }
 
+  // ========== EVENT HANDLERS ==========
+
   private handleKeyDown = (e: KeyboardEvent) => {
     if (!this.isRunning) return;
     this.keysPressed[e.code] = true;
@@ -877,8 +873,37 @@ private async fetchPlayerData() {
 
   destroy() {
     this.pause();
-    this.flushPendingActions();
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+  }
+
+  // ========== PUBLIC UTILITY METHODS ==========
+
+  getStats() {
+    return {
+      score: this.score,
+      kills: this.kills,
+      shots: this.shots,
+      isRegistered: this.isRegistered,
+      playerName: this.playerName,
+      performance: { ...this.performanceStats }
+    };
+  }
+
+  async initializeGame(): Promise<boolean> {
+    if (!this.sessionState || !this.gameStatePDA) return false;
+    
+    try {
+      const instruction = createInitializeGameIx(
+        this.gameStatePDA,
+        this.sessionState.walletPublicKey
+      );
+      
+      await this.sendTransaction(instruction, 'initialize_game');
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize game:', error);
+      return false;
+    }
   }
 }

@@ -259,6 +259,7 @@ export default function GamePage() {
             <PerformanceDashboard 
               sessionState={isEstablished(sessionState) ? sessionState : undefined}
               performanceStats={performanceStats}
+              chainData={chainData}
             />
           </div>
         </div>

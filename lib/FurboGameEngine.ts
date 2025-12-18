@@ -1,5 +1,5 @@
 // ==============================================
-// FILE: gameEngine.ts - COMPLETE FIXED VERSION
+// FILE: FurboGameEngine.ts - COMPLETE FIXED VERSION
 // ==============================================
 
 import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
@@ -10,11 +10,10 @@ import { connection } from "./connection";
 // 🔥 PROGRAM ID
 export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWfF3v7Jvhjsxawgzf28fAQvN3uf');
 
-// 🔥 DISCRIMINATORS (THỬ TỪNG CÁI)
+// 🔥 DISCRIMINATORS
 const DISCRIMINATORS = {
-  // Thử các discriminator phổ biến
-  initialize_game: Buffer.from('b3061e97be5d0688', 'hex'), // Anchor default
-  register_player: Buffer.from('8c1c8b9c5f5e5d5c', 'hex'), // Thử cái này trước
+  initialize_game: Buffer.from('b3061e97be5d0688', 'hex'),
+  register_player: Buffer.from('8c1c8b9c5f5e5d5c', 'hex'),
   game_action: Buffer.from('a1b2c3d4e5f6a7b8', 'hex'),
   end_game: Buffer.from('c4d5e6f7a8b9c0d1', 'hex'),
   update_session: Buffer.from('d2e3f4a5b6c7d8e9', 'hex')
@@ -82,7 +81,7 @@ export const createInitializeGameIx = (
   });
 };
 
-// register_player - ĐƠN GIẢN HÓA
+// register_player
 export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -94,7 +93,6 @@ export const createRegisterPlayerIx = (
   const nameLength = Buffer.alloc(4);
   nameLength.writeUInt32LE(nameBuffer.length, 0);
   
-  // Tạo data: discriminator + name_length + name + session_key
   const data = Buffer.concat([
     DISCRIMINATORS.register_player,
     nameLength,
@@ -106,7 +104,6 @@ export const createRegisterPlayerIx = (
   console.log("- Name:", name);
   console.log("- Name length:", nameBuffer.length);
   console.log("- Data length:", data.length);
-  console.log("- First 16 bytes (hex):", data.toString('hex').substring(0, 32));
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -131,7 +128,7 @@ export const createGameActionIx = (
   x: number,
   y: number
 ): TransactionInstruction => {
-  const data = Buffer.alloc(13); // 8 discriminator + 1 action + 2 x + 2 y
+  const data = Buffer.alloc(13);
   let offset = 0;
   
   DISCRIMINATORS.game_action.copy(data, offset); offset += 8;
@@ -161,7 +158,7 @@ export const createEndGameIx = (
   finalKills: number,
   finalShots: number
 ): TransactionInstruction => {
-  const data = Buffer.alloc(24); // 8 discriminator + 8 score + 4 kills + 4 shots
+  const data = Buffer.alloc(24);
   let offset = 0;
   
   DISCRIMINATORS.end_game.copy(data, offset); offset += 8;
@@ -188,7 +185,7 @@ export const createUpdateSessionIx = (
   authority: PublicKey,
   newSessionKey: PublicKey
 ): TransactionInstruction => {
-  const data = Buffer.alloc(40); // 8 discriminator + 32 session key
+  const data = Buffer.alloc(40);
   DISCRIMINATORS.update_session.copy(data, 0);
   newSessionKey.toBuffer().copy(data, 8);
   
@@ -278,19 +275,17 @@ export class FurboGameEngine {
 
   // ========== PUBLIC API ==========
   
-  // 1. Cập nhật session
   updateSession(sessionState: EstablishedSessionState | undefined) {
     this.sessionState = sessionState;
     this.initializeChainState();
   }
 
-  // 2. Đặt tên player
   setPlayerName(name: string) {
     this.playerName = name.trim();
     console.log("Player name set to:", this.playerName);
   }
 
-  // 3. Đăng ký player (QUAN TRỌNG NHẤT!)
+  // ✅ FIXED: HÀM REGISTER ĐÚNG
   async registerPlayer(): Promise<boolean> {
     console.log("🎯 ====== REGISTER PLAYER CALLED ======");
     console.log("1. Checking session state...");
@@ -343,7 +338,7 @@ export class FurboGameEngine {
         console.log("✅ Transaction link: https://fogoscan.com/tx/" + signature);
         
         this.isRegistered = true;
-        this.start(); // Auto start game
+        this.start();
         
         this.callbacks.onChainUpdate({
           playerName: this.playerName,
@@ -365,48 +360,7 @@ export class FurboGameEngine {
       return false;
     }
   }
-    
-    console.log("📋 Registration details:");
-    console.log("- Wallet:", this.sessionState.walletPublicKey.toString());
-    console.log("- Player name:", this.playerName);
-    console.log("- Session key:", this.sessionState.sessionPublicKey.toString());
-    
-    try {
-      const instruction = createRegisterPlayerIx(
-        this.playerPDA,
-        this.gameStatePDA,
-        this.sessionState.walletPublicKey,
-        this.playerName,
-        this.sessionState.sessionPublicKey
-      );
-      
-      console.log("🚀 Sending registration transaction...");
-      const signature = await this.sendTransaction(instruction, 'register');
-      
-      if (signature) {
-        console.log("✅ Registration SUCCESS!");
-        this.isRegistered = true;
-        
-        // Cập nhật UI
-        this.callbacks.onChainUpdate({
-          playerName: this.playerName,
-          playerScore: 0,
-          playerKills: 0,
-          playerShots: 0,
-          isRegistered: true
-        });
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error("❌ Registration failed:", error);
-      return false;
-    }
-  }
 
-  // 4. Khởi động game (CHỈ GỌI SAU KHI REGISTER)
   start() {
     if (!this.isRegistered) {
       console.error("❌ Cannot start: Player not registered!");
@@ -422,7 +376,6 @@ export class FurboGameEngine {
     this.gameLoop();
   }
 
-  // 5. Tạm dừng game
   pause() {
     this.isRunning = false;
     if (this.gameLoopId) {
@@ -431,7 +384,6 @@ export class FurboGameEngine {
     }
   }
 
-  // 6. Reset game
   reset() {
     this.score = 0;
     this.gameTime = 0;
@@ -445,7 +397,6 @@ export class FurboGameEngine {
     this.callbacks.onGameTimeUpdate(0);
   }
 
-  // 7. Bắn đạn (public để UI gọi)
   async shoot(): Promise<void> {
     if (!this.isRunning) {
       console.log("Game not running");
@@ -457,7 +408,6 @@ export class FurboGameEngine {
       return;
     }
 
-    // Thêm đạn vào màn hình
     this.bullets.push({
       x: this.player.x + this.player.width / 2 - 4,
       y: this.player.y - 20,
@@ -468,13 +418,12 @@ export class FurboGameEngine {
 
     this.shots++;
     
-    // Gửi lên blockchain
     try {
       const instruction = createGameActionIx(
         this.playerPDA!,
         this.gameStatePDA!,
         this.sessionState!.sessionPublicKey,
-        1, // action_type = 1 (Shoot)
+        1,
         Math.floor(this.player.x),
         Math.floor(this.player.y)
       );
@@ -485,7 +434,6 @@ export class FurboGameEngine {
     }
   }
 
-  // 8. Lấy thông số game
   getStats() {
     return {
       score: this.score,
@@ -497,7 +445,6 @@ export class FurboGameEngine {
     };
   }
 
-  // 9. Hủy game engine
   destroy() {
     this.pause();
     window.removeEventListener('keydown', this.handleKeyDown);
@@ -556,7 +503,7 @@ export class FurboGameEngine {
         this.playerPDA!,
         this.gameStatePDA!,
         this.sessionState!.sessionPublicKey,
-        0, // action_type = 0 (Move)
+        0,
         Math.floor(this.player.x),
         Math.floor(this.player.y)
       );
@@ -575,7 +522,7 @@ export class FurboGameEngine {
         this.playerPDA!,
         this.gameStatePDA!,
         this.sessionState!.sessionPublicKey,
-        2, // action_type = 2 (Kill)
+        2,
         Math.floor(this.player.x),
         Math.floor(this.player.y)
       );
@@ -611,7 +558,6 @@ export class FurboGameEngine {
     const currentTime = Date.now();
     this.gameTime += 16;
     
-    // Di chuyển player
     let moved = false;
     if (this.keysPressed['ArrowLeft']) {
       this.player.x = Math.max(0, this.player.x - this.player.speed);
@@ -622,17 +568,14 @@ export class FurboGameEngine {
       moved = true;
     }
     
-    // Gửi move action (debounce)
     if (moved && currentTime - this.lastMoveTime > this.moveDebounceMs) {
       this.sendMoveAction();
       this.lastMoveTime = currentTime;
     }
     
-    // Cập nhật đạn
     this.bullets = this.bullets.filter(bullet => {
       bullet.y -= bullet.speed;
       
-      // Kiểm tra va chạm với kẻ địch
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const enemy = this.enemies[i];
         if (this.checkCollision(bullet, enemy)) {
@@ -640,7 +583,6 @@ export class FurboGameEngine {
           this.score += 100;
           this.kills++;
           
-          // Gửi kill action
           if (currentTime - this.lastKillTime > this.killDebounceMs) {
             this.sendKillAction();
             this.lastKillTime = currentTime;
@@ -654,12 +596,10 @@ export class FurboGameEngine {
       return bullet.y > -bullet.height;
     });
     
-    // Tạo kẻ địch ngẫu nhiên
     if (Math.random() < 0.02 && this.enemies.length < 10) {
       this.spawnEnemy();
     }
     
-    // Cập nhật kẻ địch
     this.enemies = this.enemies.filter(enemy => {
       enemy.y += enemy.speed;
       
@@ -725,7 +665,6 @@ export class FurboGameEngine {
 
     const startTime = performance.now();
     
-    // Cập nhật UI
     this.callbacks.onTransactionFeedUpdate?.({
       type: type as any,
       status: 'pending',
@@ -742,7 +681,6 @@ export class FurboGameEngine {
       const confirmTime = performance.now() - startTime;
       this.performanceStats.confirmationTimes.push(confirmTime);
       
-      // Cập nhật performance
       if (this.performanceStats.confirmationTimes.length > 0) {
         const sum = this.performanceStats.confirmationTimes.reduce((a, b) => a + b, 0);
         this.performanceStats.avgConfirm = Math.floor(sum / this.performanceStats.confirmationTimes.length);
@@ -919,14 +857,12 @@ export class FurboGameEngine {
     if (e.code === 'Space') {
       e.preventDefault();
       if (!this.isRunning) {
-        // Space để start nếu game chưa chạy
         if (this.isRegistered) {
           this.start();
         } else {
           console.log("⚠️ Register player first!");
         }
       } else {
-        // Space để bắn khi game đang chạy
         this.shoot();
       }
       return;

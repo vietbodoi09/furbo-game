@@ -727,7 +727,7 @@ export class FurboGameEngine {
       this.updatePerformance();
       
       console.log(`✅ ${type} tx confirmed in ${confirmTime.toFixed(0)}ms: ${signature}`);
-      console.log(`   Signature: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+      console.log(`   Signature: https://fogoscan.com//tx/${signature}?cluster=testnet`);
       
       this.callbacks.onTransactionComplete?.(type, true, signature);
       

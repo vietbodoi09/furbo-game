@@ -1,5 +1,5 @@
 import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
-import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.js';
+import { TransactionInstruction, PublicKey, SystemProgram,TransactionMessage,VersionedTransaction  } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { connection } from "./connection";
 

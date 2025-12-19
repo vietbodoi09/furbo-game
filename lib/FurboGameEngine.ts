@@ -179,7 +179,7 @@ export class FurboGameEngine {
       // HIỂN THỊ THÔNG TIN CHO USER
       const userConfirmed = window.confirm(
         `Register player "${this.playerName}"?\n\n` +
-        `✅ Transaction fees: Covered by Fogo Paymaster\n` +
+        `✅ Transaction fees: Covered by Fogo Paymaster\n`
       );
       
       

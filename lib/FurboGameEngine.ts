@@ -204,6 +204,15 @@ export class FurboGameEngine {
     
     console.log('🎮 Game Engine initialized');
   }
+  updateSession(sessionState: EstablishedSessionState | null) {
+    this.setSession(sessionState);
+  }
+  setPlayerName(name: string) {
+    this.setName(name);
+  }
+  pause() {
+    this.stop();
+  }
 
   // ========== PUBLIC API ==========
   

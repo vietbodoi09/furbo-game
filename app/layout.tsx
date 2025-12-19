@@ -15,7 +15,7 @@ const inter = Inter({
 });
 
 // 🔥 THÊM PROGRAM ID Ở ĐÂY
-const FURBO_PROGRAM_ID = 'DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf';
+const FURBO_PROGRAM_ID = 'Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa';
 
 export const metadata = {
   title: 'Furbo Shooter - Blockchain Game on Fogo',

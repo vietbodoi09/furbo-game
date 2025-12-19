@@ -81,27 +81,27 @@ export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
   signer: PublicKey,
-  name: string
+  name: string,
+  sessionKey: PublicKey  // 🔥 THÊM parameter này
 ): TransactionInstruction => {
   
-  // Từ logs: 168fb9e7ef37c6a10700000063617463616b65...
-  // 168fb9e7ef37c6a1 = discriminator
-  // 07000000 = string length (7) = "catcake"
-  // 63617463616b65 = "catcake" in hex
-  
   const nameBuffer = serializeString(name); // 4 bytes length + string
+  const sessionKeyBuffer = sessionKey.toBuffer(); // 32 bytes
   
+  // Data = discriminator + name + session_key
   const data = Buffer.concat([
     DISCRIMINATORS.register_player, // 8 bytes
-    nameBuffer                      // string data
+    nameBuffer,                     // 4 + length bytes
+    sessionKeyBuffer                // 32 bytes
   ]);
   
   console.log('📦 RegisterPlayer Data:', {
     discriminator: DISCRIMINATORS.register_player.toString('hex'),
     name: name,
     nameLength: name.length,
+    sessionKey: sessionKey.toString(),
     totalDataHex: data.toString('hex'),
-    expectedFromLogs: '168fb9e7ef37c6a10700000063617463616b65...'
+    expectedFromLogs: '168fb9e7ef37c6a10700000063617463616b65 + 32 bytes session_key'
   });
   
   const keys = [
@@ -333,7 +333,8 @@ export class FurboGameEngine {
         playerPDA,
         gameStatePDA,
         sessionKey,  // signer
-        this.playerName  // chỉ có name parameter
+        this.playerName,  // name
+        sessionKey        // session_key parameter (cùng là session key)
       );
       
       console.log('📤 Sending transaction...');

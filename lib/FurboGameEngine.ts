@@ -329,8 +329,7 @@ export class FurboGameEngine {
       console.log('\n💰 CHECKING BALANCE & RENT:');
       
       // Lấy balance của session key
-      const sessionBalance = await connection.getBalance(sessionKey);
-      console.log('Session Balance:', sessionBalance / 1e9, 'SOL');
+
       
       // Tính rent exemption CHÍNH XÁC
       // GameState size từ Rust code của bạn

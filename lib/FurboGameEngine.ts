@@ -1,13 +1,12 @@
-"import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
+import { EstablishedSessionState } from '@fogo/sessions-sdk-react';
 import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.js';
 import { Buffer } from 'buffer';
-import { connection } from \"./connection\";
+import { connection } from "./connection";
 
 // 🔥 PROGRAM ID của bạn
 export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
 
 // ========== DISCORDINATORS TỪ LOG TRƯỚC (ĐÃ TÍNH) ==========
-// Dùng discriminators từ log: 'register_player: f292c2eaea91e42a'
 const DISCRIMINATORS = {
   initialize_game: Buffer.from('2c3e66f77ed082d7', 'hex'),
   register_player: Buffer.from('f292c2eaea91e42a', 'hex'),
@@ -35,7 +34,7 @@ export const getPlayerPDA = (sessionKey: PublicKey): [PublicKey, number] => {
 // ========== INSTRUCTION BUILDERS ==========
 
 // 🔥 Anchor serialize string: length (u32) + bytes
-function serializeString(str) {
+function serializeString(str: string): Buffer {
   const buffer = Buffer.from(str, 'utf8');
   const lengthBuffer = Buffer.alloc(4);
   lengthBuffer.writeUInt32LE(buffer.length, 0);
@@ -300,7 +299,7 @@ export class FurboGameEngine {
       console.log('✅ Registration successful!');
       this.isRegistered = true;
       
-      alert(`🎉 Registration successful!\\nPlayer: ${this.playerName}`);
+      alert(`🎉 Registration successful!\nPlayer: ${this.playerName}`);
       return true;
       
     } catch (error: any) {
@@ -317,7 +316,7 @@ export class FurboGameEngine {
         errorMsg = 'Program instruction error';
       }
       
-      alert(`❌ ${errorMsg}\\n${error.message?.substring(0, 100) || ''}`);
+      alert(`❌ ${errorMsg}\n${error.message?.substring(0, 100) || ''}`);
       return false;
     }
   }
@@ -702,4 +701,4 @@ export class FurboGameEngine {
   }
 }
 
-export default FurboGameEngine;"
+export default FurboGameEngine;

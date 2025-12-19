@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 import { connection } from "./connection";
 
 // 🔥 PROGRAM ID ĐÚNG (từ Rust code của bạn)
-export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf');
+export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
 
 // ========== DISCORDINATORS (Anchor tính tự động) ==========
 const DISCRIMINATORS = {

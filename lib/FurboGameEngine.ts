@@ -175,20 +175,13 @@ export class FurboGameEngine {
       // ✅ Phần rent sẽ được trừ từ SOL trong session wallet
       console.log('\n📤 Sending transaction via Fogo Sessions...');
       console.log('💡 Paymaster will sign and pay for GAS');
-      console.log('💰 Rent (~0.01 SOL) will come from session wallet balance');
       
       // HIỂN THỊ THÔNG TIN CHO USER
       const userConfirmed = window.confirm(
         `Register player "${this.playerName}"?\n\n` +
         `✅ Transaction fees: Covered by Fogo Paymaster\n` +
-        `💰 Account creation: Needs ~0.01 SOL from your wallet\n\n` +
-        `Make sure you have SOL in your session wallet!`
       );
       
-      if (!userConfirmed) {
-        console.log('User cancelled registration');
-        return false;
-      }
       
       const result = await this.sessionState.sendTransaction(
         instructions,

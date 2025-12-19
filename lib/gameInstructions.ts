@@ -2,7 +2,7 @@ import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.j
 import { Buffer } from 'buffer';
 
 // ========== PROGRAM CONFIG ==========
-export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf');
+export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
 
 // ========== FIXED DISCRIMINATORS ==========
 const DISCRIMINATORS = {

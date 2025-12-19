@@ -50,6 +50,10 @@ export class FurboGameEngine {
     this.setSession(sessionState);
     console.log('🔄 Session updated via updateSession method');
   }
+  setPlayerName(name: string): void {
+    this.playerName = name.trim();
+    console.log('👤 Player name set to:', this.playerName);
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;

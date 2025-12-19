@@ -35,18 +35,6 @@ export const getPlayerPDA = (sessionKey: PublicKey): [PublicKey, number] => {
   );
 };
 
-// ========== ANCHOR SERIALIZATION HELPERS ==========
-function serializeString(str: string): Buffer {
-  const encoded = Buffer.from(str, 'utf8');
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(encoded.length, 0);
-  return Buffer.concat([len, encoded]);
-}
-
-function serializePubkey(pubkey: PublicKey): Buffer {
-  return pubkey.toBuffer();
-}
-
 // ========== INSTRUCTION BUILDERS ==========
 
 // 1. initialize_game
@@ -75,7 +63,7 @@ export const createInitializeGameIx = (
   });
 };
 
-// 2. register_player
+// 2. register_player - FIXED VERSION
 export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
@@ -83,56 +71,46 @@ export const createRegisterPlayerIx = (
   name: string,
   sessionKey: PublicKey
 ): TransactionInstruction => {
-  const nameBuffer = serializeString(name);
-  const sessionKeyBuffer = serializePubkey(sessionKey);
+  // 1. Serialize name theo Anchor (4 bytes length + string)
+  const nameBuffer = Buffer.alloc(4 + 32); // Tối đa 32 chars
+  nameBuffer.writeUInt32LE(name.length, 0);
+  nameBuffer.write(name, 4, 'utf8');
+  
+  // 2. Serialize session key (32 bytes)
+  const sessionKeyBuffer = sessionKey.toBuffer();
+  
+  // 3. Build data
+  const data = Buffer.concat([
+    DISCRIMINATORS.register_player, // 8 bytes
+    nameBuffer.slice(0, 4 + name.length), // Chỉ lấy phần cần thiết
+    sessionKeyBuffer // 32 bytes
+  ]);
 
-  export const createRegisterPlayerIx = (
-    playerPDA: PublicKey,
-    gameStatePDA: PublicKey,
-    signer: PublicKey,
-    name: string,
-    sessionKey: PublicKey
-  ): TransactionInstruction => {
-    // 1. Serialize name theo Anchor (4 bytes length + string)
-    const nameBuffer = Buffer.alloc(4 + 32); // Tối đa 32 chars
-    nameBuffer.writeUInt32LE(name.length, 0);
-    nameBuffer.write(name, 4, 'utf8');
-    
-    // 2. Serialize session key (32 bytes)
-    const sessionKeyBuffer = sessionKey.toBuffer();
-    
-    // 3. Build data
-    const data = Buffer.concat([
-      DISCRIMINATORS.register_player, // 8 bytes
-      nameBuffer.slice(0, 4 + name.length), // Chỉ lấy phần cần thiết
-      sessionKeyBuffer // 32 bytes
-    ]);
-  
-    console.log('🔧 RegisterPlayer Data Structure:', {
-      discriminator: DISCRIMINATORS.register_player.toString('hex'),
-      name: name,
-      nameLength: name.length,
-      nameHex: Buffer.from(name).toString('hex'),
-      sessionKey: sessionKey.toString(),
-      sessionKeyHex: sessionKeyBuffer.toString('hex'),
-      totalDataBytes: data.length,
-      expected: 8 + 4 + name.length + 32,
-      dataHex: data.toString('hex')
-    });
-  
-    const keys = [
-      { pubkey: playerPDA, isSigner: false, isWritable: true },
-      { pubkey: gameStatePDA, isSigner: false, isWritable: true },
-      { pubkey: signer, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
-    ];
-  
-    return new TransactionInstruction({
-      programId: FURBO_PROGRAM_ID,
-      keys,
-      data
-    });
-  };
+  console.log('🔧 RegisterPlayer Data Structure:', {
+    discriminator: DISCRIMINATORS.register_player.toString('hex'),
+    name: name,
+    nameLength: name.length,
+    nameHex: Buffer.from(name).toString('hex'),
+    sessionKey: sessionKey.toString(),
+    sessionKeyHex: sessionKeyBuffer.toString('hex'),
+    totalDataBytes: data.length,
+    expected: 8 + 4 + name.length + 32,
+    dataHex: data.toString('hex')
+  });
+
+  const keys = [
+    { pubkey: playerPDA, isSigner: false, isWritable: true },
+    { pubkey: gameStatePDA, isSigner: false, isWritable: true },
+    { pubkey: signer, isSigner: true, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+  ];
+
+  return new TransactionInstruction({
+    programId: FURBO_PROGRAM_ID,
+    keys,
+    data
+  });
+};
 
 // 3. game_action
 export const createGameActionIx = (
@@ -212,9 +190,10 @@ export const createUpdateSessionIx = (
   signer: PublicKey,
   newSessionKey: PublicKey
 ): TransactionInstruction => {
+  const sessionKeyBuffer = newSessionKey.toBuffer();
   const data = Buffer.concat([
     DISCRIMINATORS.update_session,
-    serializePubkey(newSessionKey)
+    sessionKeyBuffer
   ]);
 
   const keys = [
@@ -227,4 +206,32 @@ export const createUpdateSessionIx = (
     keys,
     data
   });
+};
+
+// ========== DEBUG FUNCTION ==========
+export const debugRegisterPlayerData = (
+  name: string,
+  sessionKey: PublicKey
+): void => {
+  console.log('🔍 DEBUG RegisterPlayer Serialization:');
+  console.log('Name:', name);
+  console.log('Name length:', name.length);
+  
+  // Serialize như Anchor
+  const nameBuffer = Buffer.alloc(4 + name.length);
+  nameBuffer.writeUInt32LE(name.length, 0);
+  nameBuffer.write(name, 4, 'utf8');
+  
+  console.log('Anchor serialized name (hex):', nameBuffer.toString('hex'));
+  console.log('Session key:', sessionKey.toString());
+  console.log('Session key bytes (hex):', sessionKey.toBuffer().toString('hex'));
+  
+  const fullData = Buffer.concat([
+    DISCRIMINATORS.register_player,
+    nameBuffer,
+    sessionKey.toBuffer()
+  ]);
+  
+  console.log('Full instruction data (hex):', fullData.toString('hex'));
+  console.log('Total bytes:', fullData.length);
 };

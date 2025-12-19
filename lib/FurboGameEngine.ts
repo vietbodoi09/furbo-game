@@ -99,9 +99,35 @@ export class FurboGameEngine {
   private actionQueue: { action: string, x: number, y: number }[] = [];
   private isProcessingAction: boolean = false;
 
+  pause() {
+    console.log('⏸️ Game paused');
+    this.stop(); // Gọi stop() để tạm dừng game
+  }
+  
+  // Method stop() đã tồn tại
+  stop() {
+    this.isRunning = false;
+    if (this.gameLoopId) {
+      cancelAnimationFrame(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+    console.log('🛑 Game stopped');
+  }
+  
+  // 🔥 CŨNG THÊM CÁC METHOD KHÁC CÓ THỂ BỊ THIẾU
   updateSession(sessionState: EstablishedSessionState | null) {
     console.log('🔄 updateSession called (redirecting to setSession)');
     this.setSession(sessionState);
+  }
+  
+  setSession(sessionState: EstablishedSessionState | null) {
+    this.sessionState = sessionState;
+    if (sessionState) {
+      console.log('🔗 Session connected:', sessionState.sessionPublicKey.toString());
+      this.initializeMockPDAs(sessionState.sessionPublicKey);
+    } else {
+      console.log('🔗 Session disconnected');
+    }
   }
 
   constructor(canvas: HTMLCanvasElement) {

@@ -99,6 +99,11 @@ export class FurboGameEngine {
   private actionQueue: { action: string, x: number, y: number }[] = [];
   private isProcessingAction: boolean = false;
 
+  updateSession(sessionState: EstablishedSessionState | null) {
+    console.log('🔄 updateSession called (redirecting to setSession)');
+    this.setSession(sessionState);
+  }
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');

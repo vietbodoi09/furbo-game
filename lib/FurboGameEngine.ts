@@ -277,7 +277,6 @@ export class FurboGameEngine {
     this.isRegistering = true;
     
     try {
-      // Validate
       if (!this.sessionState) {
         alert('⚠️ Please connect wallet first!');
         return false;
@@ -305,101 +304,60 @@ export class FurboGameEngine {
         gameBump
       });
       
-      // Check if already registered
-      try {
-        const playerAccount = await connection.getAccountInfo(playerPDA);
-        if (playerAccount) {
-          console.log('✅ Player already registered');
-          this.isRegistered = true;
-          return true;
-        }
-      } catch (error) {
-        console.log('ℹ️ Player account not found');
-      }
+      // 🔥 LẤY BLOCKHASH MỚI NHẤT
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
       
-      // Check/initialize game state
-      try {
-        const gameAccount = await connection.getAccountInfo(gameStatePDA);
-        if (!gameAccount) {
-          console.log('🔄 Initializing game state...');
-          await this.initializeGame(gameStatePDA);
-        }
-      } catch (error) {
-        console.warn('⚠️ Game state check failed:', error);
-      }
-      
-      // Create instruction - CHỈ truyền name, không truyền session_key hay bump
-      const instruction = createRegisterPlayerIx(
+      // Tạo instruction
+      const registerIx = createRegisterPlayerIx(
         playerPDA,
         gameStatePDA,
-        sessionKey,  // signer
-        this.playerName,  // name
-        sessionKey        // session_key parameter (cùng là session key)
+        sessionKey,
+        this.playerName,
+        sessionKey
       );
       
-      console.log('📤 Sending transaction...');
+      // Tạo message với recent blockhash
+      const message = new TransactionMessage({
+        payerKey: sessionKey,
+        recentBlockhash: blockhash,
+        instructions: [registerIx]
+      }).compileToV0Message();
       
-      // Send transaction
-      const result = await this.sessionState.sendTransaction(
-        [instruction],
+      const transaction = new VersionedTransaction(message);
+      
+      console.log('📤 Sending transaction with recent blockhash...');
+      
+      // 🔥 DÙNG cách sendTransaction đơn giản hơn
+      const signature = await this.sessionState.sendTransaction(
+        transaction,
         { 
-          skipPreflight: false,  // Để thấy preflight errors
-          preflightCommitment: 'processed',
-          commitment: 'confirmed'
+          skipPreflight: true,
+          maxRetries: 3
         }
       );
       
-      // Extract signature
-      const signature = this.extractSignature(result);
-      if (!signature) {
-        throw new Error('Failed to get transaction signature');
-      }
+      console.log('✅ Transaction submitted:', signature);
+      console.log('🔗 Explorer:', `https://solscan.io/tx/${signature}`);
       
-      console.log('⏳ Transaction sent:', signature.slice(0, 16) + '...');
-      
-      // Wait for confirmation
-      const latestBlockhash = await connection.getLatestBlockhash();
-      const confirmation = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-        },
-        'confirmed'
-      );
-      
-      if (confirmation.value.err) {
-        console.error('❌ Transaction failed:', confirmation.value.err);
-        
-        // Check program logs
-        if (confirmation.value.err) {
-          console.error('Transaction error details:', JSON.stringify(confirmation.value.err));
+      // 🔥 KHÔNG chờ confirm ngay
+      // Chỉ check status sau 2 giây
+      setTimeout(async () => {
+        try {
+          const status = await connection.getSignatureStatus(signature);
+          console.log('📊 Transaction status:', status.value);
+        } catch (err) {
+          console.warn('Status check failed:', err);
         }
-        
-        throw new Error('Transaction failed');
-      }
+      }, 2000);
       
-      console.log('✅ Registration successful!');
+      alert(`🎉 Registration submitted!\nSignature: ${signature.slice(0, 8)}...`);
       this.isRegistered = true;
       
-      alert(`🎉 Player "${this.playerName}" registered successfully!`);
       return true;
       
     } catch (error: any) {
       console.error('💥 Registration failed:', error);
-      
-      // Hiển thị error message
-      let errorMsg = 'Registration failed';
-      if (error.message?.includes('already in use')) {
-        errorMsg = 'Player name already taken';
-      } else if (error.message?.includes('insufficient funds')) {
-        errorMsg = 'Insufficient SOL';
-      } else if (error.logs) {
-        console.error('Program logs:', error.logs);
-        errorMsg = 'Program error - check console';
-      }
-      
-      alert(`❌ ${errorMsg}`);
+      alert(`❌ ${error.message || 'Transaction failed'}`);
       return false;
       
     } finally {

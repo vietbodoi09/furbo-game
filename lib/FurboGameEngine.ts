@@ -129,6 +129,15 @@ export class FurboGameEngine {
       console.log('🔗 Session disconnected');
     }
   }
+  setPlayerName(name: string) {
+    console.log('👤 setPlayerName called:', name);
+    this.setName(name); // Gọi setName() hiện có
+  }
+  
+  setName(name: string) {
+    this.playerName = name.trim();
+    console.log('👤 Player name set:', this.playerName);
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;

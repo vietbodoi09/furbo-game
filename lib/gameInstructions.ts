@@ -86,34 +86,53 @@ export const createRegisterPlayerIx = (
   const nameBuffer = serializeString(name);
   const sessionKeyBuffer = serializePubkey(sessionKey);
 
-  const data = Buffer.concat([
-    DISCRIMINATORS.register_player,
-    nameBuffer,
-    sessionKeyBuffer
-  ]);
-
-  console.log('📦 RegisterPlayer Data Structure:', {
-    discriminator: DISCRIMINATORS.register_player.toString('hex'),
-    name: name,
-    nameBytes: nameBuffer.length,
-    sessionKey: sessionKey.toString(),
-    totalBytes: data.length,
-    dataHex: data.toString('hex').slice(0, 64) + '...'
-  });
-
-  const keys = [
-    { pubkey: playerPDA, isSigner: false, isWritable: true },
-    { pubkey: gameStatePDA, isSigner: false, isWritable: true },
-    { pubkey: signer, isSigner: true, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
-  ];
-
-  return new TransactionInstruction({
-    programId: FURBO_PROGRAM_ID,
-    keys,
-    data
-  });
-};
+  export const createRegisterPlayerIx = (
+    playerPDA: PublicKey,
+    gameStatePDA: PublicKey,
+    signer: PublicKey,
+    name: string,
+    sessionKey: PublicKey
+  ): TransactionInstruction => {
+    // 1. Serialize name theo Anchor (4 bytes length + string)
+    const nameBuffer = Buffer.alloc(4 + 32); // Tối đa 32 chars
+    nameBuffer.writeUInt32LE(name.length, 0);
+    nameBuffer.write(name, 4, 'utf8');
+    
+    // 2. Serialize session key (32 bytes)
+    const sessionKeyBuffer = sessionKey.toBuffer();
+    
+    // 3. Build data
+    const data = Buffer.concat([
+      DISCRIMINATORS.register_player, // 8 bytes
+      nameBuffer.slice(0, 4 + name.length), // Chỉ lấy phần cần thiết
+      sessionKeyBuffer // 32 bytes
+    ]);
+  
+    console.log('🔧 RegisterPlayer Data Structure:', {
+      discriminator: DISCRIMINATORS.register_player.toString('hex'),
+      name: name,
+      nameLength: name.length,
+      nameHex: Buffer.from(name).toString('hex'),
+      sessionKey: sessionKey.toString(),
+      sessionKeyHex: sessionKeyBuffer.toString('hex'),
+      totalDataBytes: data.length,
+      expected: 8 + 4 + name.length + 32,
+      dataHex: data.toString('hex')
+    });
+  
+    const keys = [
+      { pubkey: playerPDA, isSigner: false, isWritable: true },
+      { pubkey: gameStatePDA, isSigner: false, isWritable: true },
+      { pubkey: signer, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+    ];
+  
+    return new TransactionInstruction({
+      programId: FURBO_PROGRAM_ID,
+      keys,
+      data
+    });
+  };
 
 // 3. game_action
 export const createGameActionIx = (

@@ -292,88 +292,29 @@ export class FurboGameEngine {
       console.log('🔑 Session Key:', sessionKey.toString());
       
       // ========== 2. CALCULATE PDAs CORRECTLY ==========
-      // 🔥 FIX: Đảm bảo seeds đúng với Rust program
       console.log('\n🎯 CALCULATING PDAs:');
       
-      // Player PDA: seeds = [b"player", session_key]
-      const playerSeeds = [
-        Buffer.from('player'),
-        sessionKey.toBuffer()
-      ];
-      const [playerPDA, playerBump] = PublicKey.findProgramAddressSync(
-        playerSeeds,
-        FURBO_PROGRAM_ID
-      );
-      
-      // GameState PDA: seeds = [b"game_state"] (KHÔNG CÓ bump trong seeds!)
-      const gameStateSeeds = [
-        Buffer.from('game_state')  // ⚠️ CHỈ "game_state", không có bump!
-      ];
-      const [gameStatePDA, gameStateBump] = PublicKey.findProgramAddressSync(
-        gameStateSeeds,
-        FURBO_PROGRAM_ID
-      );
+      const [playerPDA, playerBump] = getPlayerPDA(sessionKey);
+      const [gameStatePDA, gameStateBump] = getGameStatePDA();
       
       this.playerPDA = playerPDA;
       this.gameStatePDA = gameStatePDA;
       
       console.log('✅ Player PDA:', playerPDA.toString());
-      console.log('   Player Bump:', playerBump);
-      console.log('   Player Seeds:', ['player', sessionKey.toString()]);
-      
       console.log('✅ GameState PDA:', gameStatePDA.toString());
-      console.log('   GameState Bump:', gameStateBump);
-      console.log('   GameState Seeds:', ['game_state']);
       
-      // ========== 3. CHECK BALANCE & RENT ==========
-      console.log('\n💰 CHECKING BALANCE & RENT:');
+      // ========== 3. REMINDER: GET FOGO SPL TOKENS ==========
+      console.log('\n💰 IMPORTANT: FOGO SPL TOKENS REQUIRED');
+      console.log('Session Address:', sessionKey.toString());
+      console.log('1. Go to https://faucet.fogo.io/');
+      console.log('2. Paste your session address above');
+      console.log('3. Select "FOGO" (SPL tokens)');
+      console.log('4. Click "Claim" and wait for confirmation');
       
-      // Lấy balance của session key
-
-      
-      // Tính rent exemption CHÍNH XÁC
-      // GameState size từ Rust code của bạn
-      const GAME_STATE_SIZE = 8 + // discriminator
-        1 + // bump (u8)
-        32 + // authority (Pubkey)
-        8 + // created_at (i64)
-        8 + // updated_at (i64)
-        8 + // total_players (u64)
-        8 + // total_games (u64)
-        8 + // total_shots (u64)
-        8 + // total_kills (u64)
-        (10 * (32 + 32 + 8 + 8)); // leaderboard [PlayerScore; 10]
-      
-      const PLAYER_SIZE = 8 + // discriminator
-        32 + // wallet (Pubkey)
-        32 + // session_key (Pubkey)
-        4 + 32 + // name (String max 32)
-        8 + // score (u64)
-        8 + // high_score (u64)
-        8 + // kills (u64)
-        8 + // shots (u64)
-        4 + // games_played (u32)
-        8 + // registered_at (i64)
-        8 + // last_active (i64)
-        1; // is_active (bool)
-      
-      console.log('📏 Account Sizes:', {
-        gameState: GAME_STATE_SIZE,
-        player: PLAYER_SIZE
-      });
-      
-      const gameStateRent = await connection.getMinimumBalanceForRentExemption(GAME_STATE_SIZE);
-      const playerRent = await connection.getMinimumBalanceForRentExemption(PLAYER_SIZE);
-      
-      console.log('💰 Rent Requirements:', {
-        gameState: gameStateRent / 1e9 + ' SOL',
-        player: playerRent / 1e9 + ' SOL',
-        total: (gameStateRent + playerRent) / 1e9 + ' SOL'
-      });
-      
-      // Kiểm tra balance đủ không
-      if (sessionBalance < gameStateRent + playerRent + 100000) { // + 0.0001 SOL cho fees
-        alert(`❌ Insufficient balance! Need at least ${(gameStateRent + playerRent) / 1e9} SOL`);
+      // Optional: Simple user confirmation
+      const hasTokens = confirm('Have you claimed FOGO SPL tokens from the faucet?\n\nAddress: ' + sessionKey.toString().slice(0, 16) + '...');
+      if (!hasTokens) {
+        console.log('⏳ Please claim FOGO SPL tokens first.');
         return false;
       }
       
@@ -396,223 +337,58 @@ export class FurboGameEngine {
       // ========== 5. CREATE INSTRUCTIONS ==========
       const instructions: TransactionInstruction[] = [];
       
-      // 🔥 OPTION A: Nếu GameState chưa tồn tại, tạo nó trước
+      // Create GameState if not exists
       if (!existingGameState) {
-        console.log('\n🔄 GameState not found, creating...');
-        
-        // Tạo instruction đúng cách
-        const initIx = createInitializeGameIx(
-          gameStatePDA,
-          sessionKey,
-          gameStateRent // Truyền rent chính xác
-        );
-        
+        console.log('\n🔄 Creating GameState account...');
+        const initIx = createInitializeGameIx(gameStatePDA, sessionKey);
         instructions.push(initIx);
-        console.log('✅ Added InitializeGame instruction');
-      } else {
-        console.log('✅ GameState already exists');
       }
       
-      // 🔥 OPTION B: Tạo Player account nếu là regular account
-      // Nhưng playerPDA là PDA, nên Program sẽ tự tạo qua CPI
-      
-      // ========== 6. CREATE REGISTER PLAYER INSTRUCTION ==========
+      // Create RegisterPlayer instruction
       console.log('\n📝 Creating RegisterPlayer instruction...');
-      
       const registerIx = createRegisterPlayerIx(
         playerPDA,
         gameStatePDA,
-        sessionKey,      // signer
+        sessionKey,
         this.playerName,
-        sessionKey       // session_key parameter
+        sessionKey
       );
-      
       instructions.push(registerIx);
       
-      console.log('📊 Instruction Details:', {
-        totalInstructions: instructions.length,
-        playerPDA: playerPDA.toString(),
-        gameStatePDA: gameStatePDA.toString(),
-        playerName: this.playerName,
-        sessionKey: sessionKey.toString()
-      });
+      console.log('📦 Total instructions to send:', instructions.length);
       
-      // ========== 7. SEND TRANSACTION ==========
-      console.log('\n📤 SENDING TRANSACTION...');
+      // ========== 6. SEND TRANSACTION ==========
+      console.log('\n📤 Sending transaction via Fogo Session SDK...');
+      console.log('Note: Fogo SDK will handle fee payment using your FOGO SPL tokens.');
       
-      // Gửi qua Session SDK (Fogo sẽ handle fees)
       const txResult = await this.sessionState.sendTransaction(
         instructions,
         { 
-          skipPreflight: false, // Để false để debug
+          skipPreflight: false, // Keep false for better error messages
           maxRetries: 2
         }
       );
       
-      console.log('📦 Transaction Result:', txResult);
-      
-      // 🔥 CRITICAL: Extract signature correctly
-      let signature: string;
-      
-      if (typeof txResult === 'string') {
-        signature = txResult;
-      } else if (txResult?.signature) {
-        signature = txResult.signature;
-        
-        // Kiểm tra lỗi ngay lập tức
-        if (txResult.error) {
-          console.error('❌ Transaction has error:', txResult.error);
-          
-          // Log chi tiết lỗi
-          if (txResult.error.InstructionError) {
-            console.error('📋 Instruction Error:', JSON.stringify(txResult.error.InstructionError, null, 2));
-            
-            // Phân tích lỗi
-            const [index, error] = txResult.error.InstructionError;
-            console.error(`   Instruction ${index} failed:`, error);
-            
-            if (error?.Custom) {
-              console.error(`   Custom Error Code: ${error.Custom}`);
-              // 3012 = AccountNotInitialized
-              // Other codes...
-            }
-          }
-          
-          alert('❌ Transaction failed on-chain. Check console.');
-          return false;
-        }
-      } else {
-        console.error('❌ Invalid transaction response:', txResult);
-        return false;
-      }
-      
-      console.log('✅ Transaction submitted!');
-      console.log('📝 Signature:', signature);
-      console.log('🔗 Explorer:', `https://fogoscan.com/tx/${signature}`);
-      
-      // ========== 8. WAIT FOR CONFIRMATION ==========
-      console.log('\n⏳ WAITING FOR CONFIRMATION...');
-      
-      const startTime = Date.now();
-      const TIMEOUT = 60000; // 60 seconds
-      
-      while (Date.now() - startTime < TIMEOUT) {
-        try {
-          // 🔥 FIX: Dùng confirmTransaction thay vì getSignatureStatus
-          const confirmation = await connection.confirmTransaction(
-            signature,
-            'confirmed'
-          );
-          
-          if (confirmation.value.err) {
-            console.error('❌ Transaction failed:', confirmation.value.err);
-            
-            // Lấy logs chi tiết
-            const tx = await connection.getTransaction(signature, {
-              commitment: 'confirmed',
-              maxSupportedTransactionVersion: 0
-            });
-            
-            if (tx?.meta?.logMessages) {
-              console.error('📋 Transaction Logs:');
-              tx.meta.logMessages.forEach((log, i) => {
-                console.error(`  [${i}] ${log}`);
-              });
-            }
-            
-            alert('❌ Transaction failed. Check console for logs.');
-            return false;
-          }
-          
-          // Transaction confirmed!
-          console.log('✅ Transaction confirmed successfully!');
-          
-          // ========== 9. VERIFY ACCOUNT CREATION ==========
-          console.log('\n🔍 VERIFYING ACCOUNT CREATION...');
-          
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Chờ 2s
-          
-          const finalPlayerAccount = await connection.getAccountInfo(playerPDA);
-          const finalGameStateAccount = await connection.getAccountInfo(gameStatePDA);
-          
-          if (!finalPlayerAccount) {
-            console.error('❌ Player account not created!');
-            alert('❌ Player account creation failed.');
-            return false;
-          }
-          
-          console.log('🎉 SUCCESS! Accounts created:');
-          console.log('   Player Account:', {
-            exists: !!finalPlayerAccount,
-            owner: finalPlayerAccount.owner.toString(),
-            lamports: finalPlayerAccount.lamports,
-            dataLength: finalPlayerAccount.data.length
-          });
-          
-          console.log('   GameState Account:', {
-            exists: !!finalGameStateAccount,
-            owner: finalGameStateAccount?.owner.toString(),
-            lamports: finalGameStateAccount?.lamports,
-            dataLength: finalGameStateAccount?.data.length
-          });
-          
-          // Update game engine state
-          this.isRegistered = true;
-          this.playerPDA = playerPDA;
-          this.gameStatePDA = gameStatePDA;
-          
-          alert(`✅ Registration successful!\nPlayer: ${this.playerName}\nPDA: ${playerPDA.toString().slice(0, 16)}...`);
-          
-          return true;
-          
-        } catch (error) {
-          console.warn('Confirmation attempt failed:', error);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Chờ 2s giữa các lần thử
-        }
-      }
-      
-      console.error('❌ Transaction confirmation timeout');
-      alert('❌ Transaction timed out. Please check explorer.');
-      return false;
+      // ... [phần xử lý kết quả giao dịch và xác nhận của bạn ở đây] ...
       
     } catch (error: any) {
       console.error('💥 REGISTRATION FAILED:', error);
       
-      // Log chi tiết
-      if (error.logs) {
-        console.error('📋 Program Logs:');
-        error.logs.forEach((log: string, i: number) => {
-          console.error(`  [${i}] ${log}`);
-        });
-      }
-      
-      if (error.message) {
-        console.error('📋 Error Message:', error.message);
-      }
-      
-      // Phân tích lỗi cụ thể
-      if (error.message?.includes('3012') || error.message?.includes('AccountNotInitialized')) {
-        console.error('💡 FIX: Ensure #[account(init)] in Rust program');
-        alert('❌ Account initialization error. Check program.');
-      }
-      
-      if (error.message?.includes('Invalid Program Argument')) {
-        console.error('💡 FIX: PDA calculation mismatch. Check seeds.');
-        alert('❌ PDA calculation error. Check console.');
-      }
-      
-      if (error.message?.includes('insufficient lamports')) {
-        console.error('💡 FIX: Sponsor needs more SOL');
-        alert('❌ Insufficient balance for rent.');
+      // Xử lý lỗi liên quan đến token
+      if (error.message?.includes('insufficient') || 
+          error.message?.includes('InsufficientFunds') ||
+          error.message?.includes('400')) {
+        console.error('💡 SOLUTION: You need FOGO SPL tokens!');
+        console.error('Go to: https://faucet.fogo.io/');
+        console.error('Address:', this.sessionState?.sessionPublicKey.toString());
+        alert('❌ Transaction failed. You may need FOGO SPL tokens.\n\nGet them from: https://faucet.fogo.io/');
       }
       
       return false;
-      
     } finally {
       this.isRegistering = false;
     }
   }
-
   // Initialize game state
   async initializeGame(gameStatePDA?: PublicKey): Promise<boolean> {
     if (!this.sessionState) return false;

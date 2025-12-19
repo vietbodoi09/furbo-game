@@ -45,6 +45,11 @@ export class FurboGameEngine {
   // Flags
   private isRegistering: boolean = false;
   private isInitializing: boolean = false;
+  updateSession(sessionState: EstablishedSessionState | null) {
+    // Đơn giản gọi setSession (hoặc logic riêng nếu cần)
+    this.setSession(sessionState);
+    console.log('🔄 Session updated via updateSession method');
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;

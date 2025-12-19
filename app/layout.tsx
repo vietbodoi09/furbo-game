@@ -14,6 +14,9 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+// 🔥 THÊM PROGRAM ID Ở ĐÂY
+const FURBO_PROGRAM_ID = 'DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf';
+
 export const metadata = {
   title: 'Furbo Shooter - Blockchain Game on Fogo',
   description: 'Real-time shooter game on Fogo Mainnet',
@@ -33,6 +36,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             [NATIVE_MINT.toBase58()]: 2_000_000_000n,
           }}
           enableUnlimited
+          // 🔥 THÊM WHITELIST QUAN TRỌNG NÀY
+          whitelist={[FURBO_PROGRAM_ID]}
           appearance={{
             theme: 'dark',
             colors: {
@@ -43,7 +48,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           {/* Background Effects */}
           <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/5 via-black to-black -z-10" />
-          <div className="fixed inset-0 bg-[url('/grid.svg')] opacity-10 -z-10" />
+          {/* 🔥 FIX GRID.SVG ERROR - THAY BẰNG CSS GRADIENT */}
+          <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] opacity-10 -z-10" />
           
           <main className="relative z-10">
             {children}

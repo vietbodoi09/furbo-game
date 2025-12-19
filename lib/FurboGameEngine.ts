@@ -10,12 +10,12 @@ export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9v
 // Anchor discriminator = first 8 bytes of SHA256("namespace:function_name")
 // namespace thường là "global" nếu không có #[namespace] trong Rust
 const DISCRIMINATORS = {
-  initialize_game: Buffer.from('7e41f6ae3c41e07b', 'hex'),  // SHA256("global:initialize_game")
-  register_player: Buffer.from('168fb9e7ef37c6a1', 'hex'),  // Từ logs: 168fb9e7ef37c6a1
-  game_action: Buffer.from('cf2a9c4b7e5d8a36', 'hex'),
-  end_game: Buffer.from('a4b8c2d5e6f7a9b1', 'hex'),
-  update_session: Buffer.from('d5e7f8a9b2c3d4e5', 'hex'),
-  batch_actions: Buffer.from('e6f7a8b9c1d2e3f4', 'hex')
+  initialize_game: Buffer.from('2c3e66f77ed082d7', 'hex'),
+  register_player: Buffer.from('f292c2eaea91e42a', 'hex'),  // 🔥 SỬA THÀNH GIÁ TRỊ TÍNH ĐƯỢC
+  game_action: Buffer.from('ab88c62f782cec7c', 'hex'),
+  end_game: Buffer.from('e087f56343af79fc', 'hex'),
+  update_session: Buffer.from('ad19eb4f28d99b67', 'hex'),
+  batch_actions: Buffer.from('1dd472db841b1ee1', 'hex')
 };
 
 // ========== PDA FUNCTIONS ==========

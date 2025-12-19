@@ -10,8 +10,8 @@ export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9v
 // Anchor discriminator = first 8 bytes of SHA256("namespace:function_name")
 // namespace thường là "global" nếu không có #[namespace] trong Rust
 const DISCRIMINATORS = {
-  initialize_game: Buffer.from('2c3e66f77ed082d7', 'hex'),
-  register_player: Buffer.from('f292c2eaea91e42a', 'hex'),  // 🔥 SỬA THÀNH GIÁ TRỊ TÍNH ĐƯỢC
+  initialize_game: Buffer.from('2c3e6ef77ed082d7', 'hex'),
+  register_player: Buffer.from('f292c2eee891e42a', 'hex'),  // 🔥 SỬA THÀNH GIÁ TRỊ TÍNH ĐƯỢC
   game_action: Buffer.from('ab88c62f782cec7c', 'hex'),
   end_game: Buffer.from('e087f56343af79fc', 'hex'),
   update_session: Buffer.from('ad19eb4f28d99b67', 'hex'),

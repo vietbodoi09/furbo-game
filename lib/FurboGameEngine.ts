@@ -337,7 +337,7 @@ export class FurboGameEngine {
       );
       
       console.log('✅ Transaction submitted:', signature);
-      console.log('🔗 Explorer:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+      console.log('🔗 Explorer:', `https://fogoscan.com/tx/${signature}?cluster=testnet`);
       
       // KHÔNG chờ confirm ngay, chỉ log
       setTimeout(async () => {

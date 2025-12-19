@@ -337,7 +337,7 @@ export class FurboGameEngine {
       );
       
       console.log('✅ Transaction submitted:', signature);
-      console.log('🔗 Explorer:', `https://solscan.io/tx/${signature}`);
+      console.log('🔗 Explorer:', `https://fogoscan.com/tx/${signature}`);
       
       // 🔥 KHÔNG chờ confirm ngay
       // Chỉ check status sau 2 giây

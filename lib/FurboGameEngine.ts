@@ -269,47 +269,65 @@ export class FurboGameEngine {
   async registerPlayer(): Promise<boolean> {
     console.log('🚀 Registering player:', this.playerName);
     
+    if (this.isRegistering) {
+      console.log('⏳ Registration in progress...');
+      return false;
+    }
+    
+    this.isRegistering = true;
+    
     try {
       if (!this.sessionState) {
         alert('⚠️ Please connect wallet first!');
         return false;
       }
       
-      const sessionKey = this.sessionState.sessionPublicKey;
-      const sponsorKey = new PublicKey('GZqBsypgu1VEZ4Q4nKGpFtXc4Hnm1cKUprGYHx8kt3e3');
+      if (!this.playerName || this.playerName.length < 3 || this.playerName.length > 20) {
+        alert('Player name must be 3-20 characters!');
+        return false;
+      }
       
+      const sessionKey = this.sessionState.sessionPublicKey;
       console.log('🔑 Session Key:', sessionKey.toString());
-      console.log('💰 Sponsor Key:', sponsorKey.toString());
       
       // Get PDAs
-      const [playerPDA] = getPlayerPDA(sessionKey);
-      const [gameStatePDA] = getGameStatePDA();
+      const [playerPDA, playerBump] = getPlayerPDA(sessionKey);
+      const [gameStatePDA, gameBump] = getGameStatePDA();
       
-      // 🔥 TẠO INSTRUCTION ĐÚNG
+      this.playerPDA = playerPDA;
+      this.gameStatePDA = gameStatePDA;
+      
+      console.log('📍 PDA Details:', {
+        playerPDA: playerPDA.toString(),
+        playerBump,
+        gameStatePDA: gameStatePDA.toString(),
+        gameBump
+      });
+      
+      // 🔥 LẤY BLOCKHASH MỚI NHẤT
+      const { blockhash } = await connection.getLatestBlockhash('finalized');
+      
+      // Tạo instruction
       const registerIx = createRegisterPlayerIx(
         playerPDA,
         gameStatePDA,
-        sessionKey,    // signer cho instruction
+        sessionKey,
         this.playerName,
-        sessionKey     // session_key parameter
+        sessionKey
       );
       
-      // 🔥 CÁCH 1A: Dùng TransactionMessage (Versioned Transaction)
-      const { blockhash } = await connection.getLatestBlockhash('finalized');
-      
+      // 🔥 Tạo message với recent blockhash
       const message = new TransactionMessage({
-        payerKey: sponsorKey,  // Sponsor là fee payer
+        payerKey: sessionKey,
         recentBlockhash: blockhash,
         instructions: [registerIx]
       }).compileToV0Message();
       
       const transaction = new VersionedTransaction(message);
       
-      console.log('📤 Sending transaction via Session SDK...');
-      console.log('💳 Fee Payer (sponsor):', sponsorKey.toString());
-      console.log('👤 Signer (session):', sessionKey.toString());
+      console.log('📤 Sending transaction with recent blockhash...');
       
-      // 🔥 GỬI QUA SESSION SDK - NÓ SẼ TỰ KÝ
+      // 🔥 DÙNG sessionState để sign và gửi transaction
       const signature = await this.sessionState.sendTransaction(
         transaction,
         { 
@@ -319,14 +337,32 @@ export class FurboGameEngine {
       );
       
       console.log('✅ Transaction submitted:', signature);
+      console.log('🔗 Explorer:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+      
+      // KHÔNG chờ confirm ngay, chỉ log
+      setTimeout(async () => {
+        try {
+          const status = await connection.getSignatureStatus(signature);
+          console.log('📊 Transaction status:', status.value);
+        } catch (err) {
+          console.warn('Status check failed:', err);
+        }
+      }, 2000);
+      
+      alert(`🎉 Registration submitted!\nSignature: ${signature.slice(0, 8)}...`);
+      this.isRegistered = true;
+      
       return true;
       
     } catch (error: any) {
       console.error('💥 Registration failed:', error);
       alert(`❌ ${error.message || 'Transaction failed'}`);
       return false;
+      
+    } finally {
+      this.isRegistering = false;
     }
-  }
+  } 
 
   // Initialize game state
   async initializeGame(gameStatePDA?: PublicKey): Promise<boolean> {

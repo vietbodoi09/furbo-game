@@ -101,17 +101,13 @@ export class FurboGameEngine {
    * REGISTER PLAYER - Main function
    */
   async registerPlayer(): Promise<boolean> {
-    console.log('🚀 REGISTER PLAYER - Starting registration process');
+    console.log('🚀 REGISTER PLAYER - CORRECT VERSION');
     
-    if (this.isRegistering) {
-      console.log('⏳ Registration already in progress');
-      return false;
-    }
-    
+    if (this.isRegistering) return false;
     this.isRegistering = true;
     
     try {
-      // 1. VALIDATE INPUTS
+      // 1. VALIDATE
       if (!this.sessionState) {
         alert('⚠️ Please connect wallet first!');
         return false;
@@ -133,18 +129,12 @@ export class FurboGameEngine {
       this.playerPDA = playerPDA;
       this.gameStatePDA = gameStatePDA;
       
-      console.log('✅ Player PDA:', playerPDA.toString(), 'Bump:', playerBump);
-      console.log('✅ GameState PDA:', gameStatePDA.toString(), 'Bump:', gameStateBump);
+      console.log('✅ Player PDA:', playerPDA.toString());
+      console.log('✅ GameState PDA:', gameStatePDA.toString());
       
-      // 3. CHECK EXISTING ACCOUNTS
-      console.log('\n🔍 Checking existing accounts:');
-      const [existingGameState, existingPlayer] = await Promise.all([
-        connection.getAccountInfo(gameStatePDA),
-        connection.getAccountInfo(playerPDA)
-      ]);
-      
-      console.log('GameState exists:', !!existingGameState);
-      console.log('Player exists:', !!existingPlayer);
+      // 3. CHECK IF ALREADY REGISTERED
+      console.log('\n🔍 Checking existing player...');
+      const existingPlayer = await connection.getAccountInfo(playerPDA);
       
       if (existingPlayer) {
         console.log('✅ Player already registered');
@@ -153,65 +143,52 @@ export class FurboGameEngine {
         return true;
       }
       
-      // 4. BUILD TRANSACTION INSTRUCTIONS
+      // 4. CHECK IF GAME STATE EXISTS
+      const existingGameState = await connection.getAccountInfo(gameStatePDA);
+      console.log('GameState exists:', !!existingGameState);
+      
+      // 5. CREATE INSTRUCTIONS
       const instructions: TransactionInstruction[] = [];
       
-      // 4.1 Create and initialize GameState if needed
+      // Nếu GameState chưa tồn tại, thêm initialize instruction
       if (!existingGameState) {
-        console.log('\n🔄 GameState account not found, creating...');
-        
-        // Create account instruction
-        const createGameStateIx = SystemProgram.createAccount({
-          fromPubkey: sessionKey,
-          newAccountPubkey: gameStatePDA,
-          lamports: await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZES.GAME_STATE),
-          space: ACCOUNT_SIZES.GAME_STATE,
-          programId: FURBO_PROGRAM_ID,
-        });
-        instructions.push(createGameStateIx);
-        
-        // Initialize instruction
+        console.log('\n🔄 Adding InitializeGame instruction...');
         const initIx = createInitializeGameIx(gameStatePDA, sessionKey);
         instructions.push(initIx);
       }
       
-      // 4.2 Create Player account
-      console.log('\n👤 Creating Player account...');
-      const createPlayerIx = SystemProgram.createAccount({
-        fromPubkey: sessionKey,
-        newAccountPubkey: playerPDA,
-        lamports: await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZES.PLAYER),
-        space: ACCOUNT_SIZES.PLAYER,
-        programId: FURBO_PROGRAM_ID,
-      });
-      instructions.push(createPlayerIx);
-      
-      // 4.3 Register player
+      // THÊM DUY NHẤT RegisterPlayer instruction
+      // ✅ Anchor sẽ tự động tạo account!
       console.log('\n📝 Adding RegisterPlayer instruction...');
       const registerIx = createRegisterPlayerIx(
         playerPDA,
         gameStatePDA,
-        sessionKey,    // signer
+        sessionKey,
         this.playerName,
-        sessionKey     // session_key parameter (same as wallet)
+        sessionKey
       );
       instructions.push(registerIx);
       
       console.log('📦 Total instructions:', instructions.length);
       
-      // 5. CHECK BALANCE
-      const balance = await connection.getBalance(sessionKey);
-      const minBalance = await connection.getMinimumBalanceForRentExemption(
-        ACCOUNT_SIZES.PLAYER + (!existingGameState ? ACCOUNT_SIZES.GAME_STATE : 0)
+      // 6. GỬI TRANSACTION - Paymaster sẽ sign và trả phí GAS
+      // ✅ Phần rent sẽ được trừ từ SOL trong session wallet
+      console.log('\n📤 Sending transaction via Fogo Sessions...');
+      console.log('💡 Paymaster will sign and pay for GAS');
+      console.log('💰 Rent (~0.01 SOL) will come from session wallet balance');
+      
+      // HIỂN THỊ THÔNG TIN CHO USER
+      const userConfirmed = window.confirm(
+        `Register player "${this.playerName}"?\n\n` +
+        `✅ Transaction fees: Covered by Fogo Paymaster\n` +
+        `💰 Account creation: Needs ~0.01 SOL from your wallet\n\n` +
+        `Make sure you have SOL in your session wallet!`
       );
       
-      if (balance < minBalance) {
-        alert(`❌ Insufficient SOL for rent exemption!\n\nNeeded: ${minBalance / 1e9} SOL\nAvailable: ${balance / 1e9} SOL`);
+      if (!userConfirmed) {
+        console.log('User cancelled registration');
         return false;
       }
-      
-      // 6. SEND TRANSACTION
-      console.log('\n📤 Sending transaction via Fogo SDK...');
       
       const result = await this.sessionState.sendTransaction(
         instructions,
@@ -230,9 +207,8 @@ export class FurboGameEngine {
         throw new Error('No transaction signature returned');
       }
       
-      console.log('✅ Transaction signature:', signature);
+      console.log('✅ Transaction sent:', signature);
       
-      // Wait for confirmation
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       
       if (confirmation.value.err) {
@@ -242,28 +218,35 @@ export class FurboGameEngine {
       // 8. UPDATE STATE
       this.isRegistered = true;
       console.log('🎉 Player registered successfully!');
-      alert('✅ Player registered successfully!');
+      alert('✅ Player registered successfully!\n\nAll transaction fees covered by Fogo Paymaster.');
       
       return true;
       
     } catch (error: any) {
       console.error('💥 REGISTRATION FAILED:', error);
       
-      // Handle specific errors
-      if (error.message?.includes('insufficient funds') || error.message?.includes('0x0')) {
-        console.error('❌ Not enough SOL for rent exemption!');
-        alert('Insufficient SOL for account creation. You need ~0.0014 SOL for rent exemption.');
-      } else if (error.message?.includes('InvalidProgramArgument')) {
-        console.error('❌ Invalid program argument - check instruction data');
-        alert('Registration failed: Invalid data format. Check console for details.');
-      } else if (error.message?.includes('400') || error.message?.includes('FOGO')) {
-        console.error('❌ FOGO tokens required for fees');
-        alert('FOGO SPL tokens required for transaction fees.\n\nGet them from: https://faucet.fogo.io/');
-      } else if (error.message?.includes('Account already initialized')) {
-        console.error('❌ Account already exists');
-        alert('Player account already exists!');
+      // XỬ LÝ LỖI CỤ THỂ
+      if (error.message?.includes('insufficient funds') || 
+          error.message?.includes('0x0') ||
+          error.message?.includes('InsufficientFundsForRent')) {
+        
+        console.error('❌ INSUFFICIENT SOL FOR RENT!');
+        alert(
+          '❌ Registration failed!\n\n' +
+          'Your session wallet needs SOL for account creation (rent).\n\n' +
+          '🔧 Quick fix:\n' +
+          '1. Go to: https://solfaucet.com/\n' +
+          '2. Enter your session address:\n' +
+          '   ' + this.sessionState?.sessionPublicKey.toString() + '\n' +
+          '3. Get 0.05 SOL (free)\n' +
+          '4. Try again!\n\n' +
+          '💡 Transaction fees are already covered by Fogo Paymaster.'
+        );
+        
+      } else if (error.message?.includes('custom program error: 0x0')) {
+        console.error('❌ Program error - check instruction data');
+        alert('Registration failed: Program rejected the transaction. Check console for details.');
       } else {
-        console.error('❌ Unknown error:', error);
         alert('Registration failed: ' + error.message);
       }
       

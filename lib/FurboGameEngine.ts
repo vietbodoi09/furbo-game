@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 import { connection } from "./connection";
 
 // 🔥 PROGRAM ID ĐÚNG
-export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUv9vVP3kUsWbEa');
+export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
 
 // ========== DISCORDINATORS (PHẢI TÍNH ĐÚNG) ==========
 // Anchor discriminator = first 8 bytes of SHA256("namespace:function_name")

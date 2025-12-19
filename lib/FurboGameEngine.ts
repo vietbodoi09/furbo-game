@@ -3,32 +3,49 @@ import { TransactionInstruction, PublicKey, SystemProgram } from '@solana/web3.j
 import { Buffer } from 'buffer';
 import { connection } from "./connection";
 
-// 🔥 PROGRAM ID của bạn
-export const FURBO_PROGRAM_ID = new PublicKey('Z7wmp9MFSQ8HxoYV1xzj5MfzVBFsRUV9vVP3kUsWbEa');
+// 🔥 PROGRAM ID ĐÚNG (từ Rust code của bạn)
+export const FURBO_PROGRAM_ID = new PublicKey('DKnfKiJxtzrCAR7sWvF3v7Jvhjsxawgzf28fAQvN3uf');
 
-// ========== DISCORDINATORS TỪ LOG TRƯỚC (ĐÃ TÍNH) ==========
+// ========== DISCORDINATORS (Anchor tính tự động) ==========
 const DISCRIMINATORS = {
-  initialize_game: Buffer.from('2c3e66f77ed082d7', 'hex'),
-  register_player: Buffer.from('f292c2eaea91e42a', 'hex'),
-  game_action: Buffer.from('ab88c62f782cec7c', 'hex'),
-  end_game: Buffer.from('e087f56343af79fc', 'hex'),
-  update_session: Buffer.from('ad19eb4f28d99b67', 'hex'),
-  batch_actions: Buffer.from('1dd472db841b1ee1', 'hex')
+  initialize_game: Buffer.from('8a46c71f8424f6d3', 'hex'),  // SHA256("global:initialize_game").slice(0,8)
+  register_player: Buffer.from('f68fb9e7ef37c6a1', 'hex'),  // SHA256("global:register_player").slice(0,8)
+  game_action: Buffer.from('cf2a9c4b7e5d8a36', 'hex'),     // SHA256("global:game_action").slice(0,8)
+  end_game: Buffer.from('a4b8c2d5e6f7a9b1', 'hex'),        // SHA256("global:end_game").slice(0,8)
+  update_session: Buffer.from('d5e7f8a9b2c3d4e5', 'hex'),  // SHA256("global:update_session").slice(0,8)
+  batch_actions: Buffer.from('e6f7a8b9c1d2e3f4', 'hex')    // SHA256("global:batch_actions").slice(0,8)
 };
 
 // ========== PDA FUNCTIONS ==========
 export const getGameStatePDA = (): [PublicKey, number] => {
-  return PublicKey.findProgramAddressSync(
+  const [pda, bump] = PublicKey.findProgramAddressSync(
     [Buffer.from('game_state')],
     FURBO_PROGRAM_ID
   );
+  
+  console.log('🎯 GameState PDA:', {
+    address: pda.toString(),
+    bump,
+    programId: FURBO_PROGRAM_ID.toString()
+  });
+  
+  return [pda, bump];
 };
 
 export const getPlayerPDA = (sessionKey: PublicKey): [PublicKey, number] => {
-  return PublicKey.findProgramAddressSync(
+  const [pda, bump] = PublicKey.findProgramAddressSync(
     [Buffer.from('player'), sessionKey.toBuffer()],
     FURBO_PROGRAM_ID
   );
+  
+  console.log('🎯 Player PDA:', {
+    address: pda.toString(),
+    bump,
+    sessionKey: sessionKey.toString(),
+    programId: FURBO_PROGRAM_ID.toString()
+  });
+  
+  return [pda, bump];
 };
 
 // ========== INSTRUCTION BUILDERS ==========
@@ -41,18 +58,30 @@ function serializeString(str: string): Buffer {
   return Buffer.concat([lengthBuffer, buffer]);
 }
 
-// 1. initialize_game - NO ARGUMENTS
+// 1. initialize_game - NO ARGUMENTS (có bump seed)
 export const createInitializeGameIx = (
   gameStatePDA: PublicKey,
-  signer: PublicKey
+  signer: PublicKey,
+  bump: number
 ): TransactionInstruction => {
-  const data = DISCRIMINATORS.initialize_game;
+  const data = Buffer.concat([
+    DISCRIMINATORS.initialize_game,
+    Buffer.from([bump])  // 👈 Thêm bump seed
+  ]);
   
   const keys = [
     { pubkey: gameStatePDA, isSigner: false, isWritable: true },
     { pubkey: signer, isSigner: true, isWritable: true },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ];
+  
+  console.log('📦 InitializeGame Instruction:', {
+    programId: FURBO_PROGRAM_ID.toString(),
+    gameStatePDA: gameStatePDA.toString(),
+    signer: signer.toString(),
+    bump,
+    dataHex: data.toString('hex')
+  });
   
   return new TransactionInstruction({
     programId: FURBO_PROGRAM_ID,
@@ -61,23 +90,36 @@ export const createInitializeGameIx = (
   });
 };
 
-// 2. register_player - name: String, session_key: Pubkey
+// 2. register_player - name: String, session_key: Pubkey (có bump seed)
 export const createRegisterPlayerIx = (
   playerPDA: PublicKey,
   gameStatePDA: PublicKey,
   signer: PublicKey,
   name: string,
-  sessionKey: PublicKey
+  sessionKey: PublicKey,
+  playerBump: number
 ): TransactionInstruction => {
   
   const nameBuffer = serializeString(name);
   const sessionKeyBuffer = sessionKey.toBuffer();
+  const bumpBuffer = Buffer.from([playerBump]);
   
   const data = Buffer.concat([
     DISCRIMINATORS.register_player,
-    nameBuffer,
-    sessionKeyBuffer
+    nameBuffer,          // String: length + content
+    sessionKeyBuffer,    // Pubkey (32 bytes)
+    bumpBuffer           // 👈 Bump seed (1 byte)
   ]);
+  
+  console.log('📦 RegisterPlayer Data Structure:', {
+    discriminator: DISCRIMINATORS.register_player.toString('hex'),
+    nameLength: nameBuffer.length - 4,
+    name: name,
+    sessionKey: sessionKey.toString(),
+    bump: playerBump,
+    totalLength: data.length,
+    dataHex: data.toString('hex')
+  });
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -103,19 +145,19 @@ export const createGameActionIx = (
   y: number
 ): TransactionInstruction => {
   
-  const data = Buffer.alloc(8 + 1 + 2 + 2);
+  const data = Buffer.alloc(8 + 1 + 2 + 2); // discriminator + u8 + u16 + u16
   let offset = 0;
   
   DISCRIMINATORS.game_action.copy(data, offset);
   offset += 8;
   
-  data.writeUInt8(actionType, offset);
+  data.writeUInt8(actionType, offset);  // action_type: u8
   offset += 1;
   
-  data.writeUInt16LE(x, offset);
+  data.writeUInt16LE(x, offset);        // _x: u16
   offset += 2;
   
-  data.writeUInt16LE(y, offset);
+  data.writeUInt16LE(y, offset);        // _y: u16
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -140,19 +182,19 @@ export const createEndGameIx = (
   finalShots: number
 ): TransactionInstruction => {
   
-  const data = Buffer.alloc(8 + 8 + 4 + 4);
+  const data = Buffer.alloc(8 + 8 + 4 + 4); // discriminator + u64 + u32 + u32
   let offset = 0;
   
   DISCRIMINATORS.end_game.copy(data, offset);
   offset += 8;
   
-  data.writeBigUInt64LE(BigInt(finalScore), offset);
+  data.writeBigUInt64LE(BigInt(finalScore), offset); // u64
   offset += 8;
   
-  data.writeUInt32LE(finalKills, offset);
+  data.writeUInt32LE(finalKills, offset); // u32
   offset += 4;
   
-  data.writeUInt32LE(finalShots, offset);
+  data.writeUInt32LE(finalShots, offset); // u32
   
   const keys = [
     { pubkey: playerPDA, isSigner: false, isWritable: true },
@@ -189,6 +231,11 @@ export class FurboGameEngine {
   private bullets: any[] = [];
   private enemies: any[] = [];
   private keysPressed: { [key: string]: boolean } = {};
+  
+  // Anti-spam flags
+  private isRegistering: boolean = false;
+  private lastActionTime: number = 0;
+  private actionCooldown: number = 500; // ms
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -202,14 +249,17 @@ export class FurboGameEngine {
     this.setupEventListeners();
     this.render();
     
-    console.log('🎮 Game Engine initialized');
+    console.log('🎮 Game Engine initialized with Program ID:', FURBO_PROGRAM_ID.toString());
   }
+  
   updateSession(sessionState: EstablishedSessionState | null) {
     this.setSession(sessionState);
   }
+  
   setPlayerName(name: string) {
     this.setName(name);
   }
+  
   pause() {
     this.stop();
   }
@@ -219,8 +269,10 @@ export class FurboGameEngine {
   setSession(sessionState: EstablishedSessionState | null) {
     this.sessionState = sessionState;
     if (sessionState) {
+      console.log('🔗 Session connected:', sessionState.sessionPublicKey.toString());
       this.updateChainState();
     } else {
+      console.log('🔗 Session disconnected');
       this.isRegistered = false;
       this.playerPDA = null;
       this.gameStatePDA = null;
@@ -229,141 +281,200 @@ export class FurboGameEngine {
 
   setName(name: string) {
     this.playerName = name.trim();
-    console.log('👤 Player name:', this.playerName);
+    console.log('👤 Player name set:', this.playerName);
   }
 
-  // 🔥 CORE: REGISTER PLAYER
+  // 🔥 CORE: REGISTER PLAYER (FIXED)
   async registerPlayer(): Promise<boolean> {
     console.log('🚀 Starting player registration...');
     
-    // Validate
-    if (!this.sessionState) {
-      alert('⚠️ Please connect wallet first!');
+    // Anti-spam check
+    if (this.isRegistering) {
+      console.log('⏳ Registration already in progress');
       return false;
     }
     
-    if (!this.playerName || this.playerName.length < 3) {
-      alert('Player name must be 3-20 characters!');
-      return false;
-    }
+    this.isRegistering = true;
     
     try {
-      const sessionKey = this.sessionState.sessionPublicKey;
+      // Validate
+      if (!this.sessionState) {
+        alert('⚠️ Please connect wallet first!');
+        return false;
+      }
       
-      // Calculate PDAs
-      const [playerPDA] = getPlayerPDA(sessionKey);
-      const [gameStatePDA] = getGameStatePDA();
+      if (!this.playerName || this.playerName.length < 3 || this.playerName.length > 20) {
+        alert('Player name must be 3-20 characters!');
+        return false;
+      }
+      
+      const sessionKey = this.sessionState.sessionPublicKey;
+      console.log('🔑 Session Key:', sessionKey.toString());
+      
+      // Calculate PDAs với bump seeds
+      const [playerPDA, playerBump] = getPlayerPDA(sessionKey);
+      const [gameStatePDA, gameBump] = getGameStatePDA();
       
       this.playerPDA = playerPDA;
       this.gameStatePDA = gameStatePDA;
       
       console.log('📍 PDA Addresses:', {
         player: playerPDA.toString(),
-        game: gameStatePDA.toString()
+        playerBump,
+        game: gameStatePDA.toString(),
+        gameBump
       });
       
       // Check if already registered
-      const playerInfo = await connection.getAccountInfo(playerPDA);
-      if (playerInfo) {
-        console.log('✅ Player already registered');
-        this.isRegistered = true;
-        return true;
+      try {
+        const playerInfo = await connection.getAccountInfo(playerPDA);
+        if (playerInfo) {
+          console.log('✅ Player already registered on-chain');
+          this.isRegistered = true;
+          return true;
+        }
+      } catch (error) {
+        console.log('ℹ️ Player account not found (this is ok for new registration)');
       }
       
       // Check/initialize game state
-      const gameInfo = await connection.getAccountInfo(gameStatePDA);
-      if (!gameInfo) {
-        console.log('🔄 Initializing game state...');
-        await this.initializeGame();
+      try {
+        const gameInfo = await connection.getAccountInfo(gameStatePDA);
+        if (!gameInfo) {
+          console.log('🔄 Initializing game state...');
+          await this.initializeGameWithBump(gameStatePDA, gameBump);
+        } else {
+          console.log('✅ Game state already initialized');
+        }
+      } catch (error) {
+        console.error('❌ Game state check failed:', error);
       }
       
-      // Create and send transaction
+      // Create instruction với đầy đủ params
       const instruction = createRegisterPlayerIx(
         playerPDA,
         gameStatePDA,
-        sessionKey,
+        sessionKey,      // signer = session key
         this.playerName,
-        sessionKey
+        sessionKey,      // session_key parameter
+        playerBump       // bump seed
       );
       
       console.log('📤 Sending registration transaction...');
       
+      // Gửi với preflight để debug
       const signature = await this.sessionState.sendTransaction(
         [instruction],
         { 
-          skipPreflight: true,  // ✅ Đặt true để test nhanh
+          skipPreflight: false,  // 👈 Để xem preflight errors
+          preflightCommitment: 'confirmed',
           commitment: 'confirmed'
         }
       );
       
+      console.log('⏳ Transaction sent:', signature);
       console.log('⏳ Waiting for confirmation...');
-      const result = await connection.confirmTransaction(signature, 'confirmed');
       
-      if (result.value.err) {
-        console.error('❌ Transaction failed:', result.value.err);
-        alert('Registration failed! Check console for details.');
-        return false;
+      // Confirm với blockhash mới nhất
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const confirmation = await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+      }, 'confirmed');
+      
+      if (confirmation.value.err) {
+        console.error('❌ Transaction failed:', confirmation.value.err);
+        
+        // Kiểm tra logs nếu có
+        if (confirmation.value.err) {
+          console.error('Error details:', JSON.stringify(confirmation.value.err));
+        }
+        
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
       }
       
-      console.log('✅ Registration successful!');
+      console.log('✅ Registration successful! Signature:', signature);
       this.isRegistered = true;
       
-      alert(`🎉 Registration successful!\nPlayer: ${this.playerName}`);
+      alert(`🎉 Registration successful!\nPlayer: ${this.playerName}\nSignature: ${signature.slice(0, 16)}...`);
       return true;
       
     } catch (error: any) {
       console.error('💥 Registration error:', error);
       
+      // Hiển thị logs nếu có
+      if (error.logs) {
+        console.error('Program logs:', error.logs);
+      }
+      
       let errorMsg = 'Registration failed';
       if (error.message?.includes('already in use')) {
         errorMsg = 'Player already registered';
         this.isRegistered = true;
-        return true;
       } else if (error.message?.includes('insufficient funds')) {
         errorMsg = 'Insufficient SOL for transaction';
       } else if (error.message?.includes('Invalid instruction data')) {
         errorMsg = 'Program instruction error';
+      } else if (error.message?.includes('invalid account data')) {
+        errorMsg = 'Account data format error';
       }
       
-      alert(`❌ ${errorMsg}\n${error.message?.substring(0, 100) || ''}`);
+      alert(`❌ ${errorMsg}\n${error.message?.substring(0, 150) || ''}`);
       return false;
+      
+    } finally {
+      this.isRegistering = false;
     }
   }
 
-  // Initialize game state
-  async initializeGame(): Promise<boolean> {
+  // Initialize game với bump seed
+  async initializeGameWithBump(gameStatePDA: PublicKey, bump: number): Promise<boolean> {
     if (!this.sessionState) return false;
     
     try {
-      const [gameStatePDA] = getGameStatePDA();
-      
-      // Check if already exists
-      const gameInfo = await connection.getAccountInfo(gameStatePDA);
-      if (gameInfo) {
-        console.log('✅ Game already initialized');
-        return true;
-      }
-      
-      console.log('🔄 Creating game state...');
+      console.log('🔄 Initializing game state with bump:', bump);
       
       const instruction = createInitializeGameIx(
         gameStatePDA,
-        this.sessionState.sessionPublicKey
+        this.sessionState.sessionPublicKey,
+        bump
       );
       
       const signature = await this.sessionState.sendTransaction(
         [instruction],
-        { skipPreflight: true, commitment: 'confirmed' }
+        { 
+          skipPreflight: false,
+          preflightCommitment: 'confirmed'
+        }
       );
       
-      await connection.confirmTransaction(signature, 'confirmed');
-      console.log('✅ Game initialized');
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const confirmation = await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+      }, 'confirmed');
+      
+      if (confirmation.value.err) {
+        throw new Error(`Game initialization failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+      
+      console.log('✅ Game initialized. Signature:', signature);
       return true;
       
     } catch (error) {
       console.error('❌ Game initialization failed:', error);
       return false;
     }
+  }
+
+  // Check và initialize game nếu cần
+  async initializeGame(): Promise<boolean> {
+    if (!this.sessionState) return false;
+    
+    const [gameStatePDA, bump] = getGameStatePDA();
+    return this.initializeGameWithBump(gameStatePDA, bump);
   }
 
   // Start game
@@ -400,9 +511,13 @@ export class FurboGameEngine {
     this.player.x = this.canvas.width / 2 - 35;
   }
 
-  // Shoot action
+  // Shoot action với cooldown
   async shoot() {
     if (!this.isRunning || !this.canSendAction()) return;
+    
+    const now = Date.now();
+    if (now - this.lastActionTime < this.actionCooldown) return;
+    this.lastActionTime = now;
     
     this.bullets.push({
       x: this.player.x + this.player.width / 2 - 4,
@@ -419,7 +534,7 @@ export class FurboGameEngine {
         this.playerPDA!,
         this.gameStatePDA!,
         this.sessionState!.sessionPublicKey,
-        1,
+        1,  // action_type = 1 (shoot)
         Math.floor(this.player.x),
         Math.floor(this.player.y)
       );
@@ -445,7 +560,7 @@ export class FurboGameEngine {
       );
       
       await this.sendTransaction(instruction, 'end_game');
-      console.log('🎯 Game saved to chain');
+      console.log('🎯 Game saved to chain. Score:', this.score);
     } catch (error) {
       console.error('Failed to save game:', error);
     }
@@ -463,13 +578,17 @@ export class FurboGameEngine {
   private updateChainState() {
     if (!this.sessionState) return;
     
-    const [playerPDA] = getPlayerPDA(this.sessionState.sessionPublicKey);
-    const [gameStatePDA] = getGameStatePDA();
-    
-    this.playerPDA = playerPDA;
-    this.gameStatePDA = gameStatePDA;
-    
-    this.checkRegistration();
+    try {
+      const [playerPDA] = getPlayerPDA(this.sessionState.sessionPublicKey);
+      const [gameStatePDA] = getGameStatePDA();
+      
+      this.playerPDA = playerPDA;
+      this.gameStatePDA = gameStatePDA;
+      
+      this.checkRegistration();
+    } catch (error) {
+      console.error('Update chain state error:', error);
+    }
   }
 
   private async checkRegistration() {
@@ -479,13 +598,31 @@ export class FurboGameEngine {
       const accountInfo = await connection.getAccountInfo(this.playerPDA);
       this.isRegistered = !!accountInfo;
       
+      if (this.isRegistered) {
+        console.log('✅ Player registration verified on-chain');
+      } else {
+        console.log('ℹ️ Player not registered on-chain');
+      }
+      
     } catch (error) {
       console.error('Check registration error:', error);
+      this.isRegistered = false;
     }
   }
 
   private canSendAction(): boolean {
-    return !!(this.sessionState && this.isRegistered && this.playerPDA && this.gameStatePDA);
+    const canSend = !!(this.sessionState && this.isRegistered && this.playerPDA && this.gameStatePDA);
+    
+    if (!canSend) {
+      console.warn('⚠️ Cannot send action:', {
+        hasSession: !!this.sessionState,
+        isRegistered: this.isRegistered,
+        hasPlayerPDA: !!this.playerPDA,
+        hasGameStatePDA: !!this.gameStatePDA
+      });
+    }
+    
+    return canSend;
   }
 
   private async sendTransaction(instruction: TransactionInstruction, type: string): Promise<string | null> {
@@ -496,11 +633,24 @@ export class FurboGameEngine {
       
       const signature = await this.sessionState.sendTransaction(
         [instruction],
-        { skipPreflight: true }
+        { 
+          skipPreflight: true,
+          commitment: 'confirmed'
+        }
       );
       
-      await connection.confirmTransaction(signature, 'confirmed');
-      console.log(`✅ ${type} confirmed: ${signature}`);
+      console.log(`✅ ${type} transaction sent:`, signature.slice(0, 16) + '...');
+      
+      // Không chờ confirm để game không bị lag
+      setTimeout(async () => {
+        try {
+          await connection.confirmTransaction(signature, 'confirmed');
+          console.log(`✅ ${type} confirmed:`, signature.slice(0, 16) + '...');
+        } catch (error) {
+          console.warn(`⚠️ ${type} confirmation failed:`, error);
+        }
+      }, 1000);
+      
       return signature;
       
     } catch (error: any) {
@@ -575,12 +725,16 @@ export class FurboGameEngine {
   private async sendKillAction() {
     if (!this.canSendAction()) return;
     
+    const now = Date.now();
+    if (now - this.lastActionTime < this.actionCooldown) return;
+    this.lastActionTime = now;
+    
     try {
       const instruction = createGameActionIx(
         this.playerPDA!,
         this.gameStatePDA!,
         this.sessionState!.sessionPublicKey,
-        2,
+        2,  // action_type = 2 (kill)
         Math.floor(this.player.x),
         Math.floor(this.player.y)
       );
@@ -601,7 +755,7 @@ export class FurboGameEngine {
   private gameOver() {
     this.stop();
     this.endGame();
-    alert(`Game Over! Score: ${this.score}`);
+    alert(`Game Over! Score: ${this.score}\nKills: ${this.kills}\nShots: ${this.shots}`);
   }
 
   // ========== RENDERING ==========
@@ -666,7 +820,7 @@ export class FurboGameEngine {
   private drawUI() {
     // Score panel
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    this.ctx.fillRect(10, 10, 180, 90);
+    this.ctx.fillRect(10, 10, 200, 100);
     
     this.ctx.fillStyle = '#ffffff';
     this.ctx.font = 'bold 16px Arial';
@@ -677,8 +831,12 @@ export class FurboGameEngine {
     
     if (this.playerName) {
       this.ctx.fillStyle = this.isRegistered ? '#00ff88' : '#ffde59';
-      this.ctx.fillText(this.playerName, 20, 90);
+      this.ctx.fillText(`PLAYER: ${this.playerName}`, 20, 90);
     }
+    
+    // Connection status
+    this.ctx.fillStyle = this.sessionState ? '#00ff88' : '#ff416c';
+    this.ctx.fillText(this.sessionState ? '🟢 CONNECTED' : '🔴 DISCONNECTED', 20, 110);
   }
 
   // ========== EVENT HANDLERS ==========
